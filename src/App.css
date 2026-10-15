@@ -170,6 +170,177 @@
   color: var(--accent-deep);
 }
 
+.import-panel {
+  margin-bottom: 1.25rem;
+  padding: 0.9rem 1rem 0.85rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+}
+
+.import-panel header h2,
+.monthly header h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+}
+
+.import-panel header p,
+.monthly header p,
+.monthly__caption,
+.import-panel__hint {
+  margin: 0.35rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.import-panel__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.1rem;
+  align-items: end;
+  margin-top: 0.85rem;
+}
+
+.import-panel__file {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.import-panel__file input {
+  font: inherit;
+  font-size: 0.88rem;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+
+.import-panel__mode {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.9rem;
+  align-items: center;
+}
+
+.import-panel__mode legend {
+  width: 100%;
+  padding: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.import-panel__mode label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.92rem;
+  color: var(--ink);
+}
+
+.import-panel button {
+  font: inherit;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.import-panel button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.import-panel__hint {
+  max-width: 52rem;
+}
+
+.import-panel__note {
+  margin: 0.65rem 0 0;
+  font-size: 0.9rem;
+  color: var(--accent-deep);
+}
+
+.import-panel__error {
+  margin: 0.65rem 0 0;
+  font-size: 0.9rem;
+  color: var(--down);
+}
+
+.monthly {
+  margin-bottom: 1.75rem;
+}
+
+.monthly header {
+  margin-bottom: 0.75rem;
+}
+
+.monthly__grid {
+  display: grid;
+  grid-template-columns: 1.25fr 0.9fr;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.monthly__caption {
+  margin-bottom: 0.25rem;
+  font-size: 0.82rem;
+}
+
+.monthly__empty {
+  margin: 1.5rem 0;
+  color: var(--ink-soft);
+}
+
+.monthly-table tr.is-active td {
+  background: rgba(233, 163, 25, 0.2);
+}
+
+.monthly-table tfoot th,
+.monthly-table tfoot td {
+  font-weight: 650;
+  background: #e8f2ec;
+}
+
+.share-list {
+  list-style: none;
+  margin: 0.15rem 0 0.35rem;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.share-list li {
+  display: grid;
+  grid-template-columns: 0.7rem minmax(0, 1fr) auto auto;
+  gap: 0.45rem;
+  align-items: center;
+  font-size: 0.88rem;
+}
+
+.share-list__swatch {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 1px;
+}
+
+.share-list__pct {
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  color: var(--accent-deep);
+}
+
 .rep-board {
   margin-bottom: 1.5rem;
 }
@@ -378,7 +549,8 @@ th button {
     grid-template-columns: 1fr 1fr;
   }
 
-  .charts {
+  .charts,
+  .monthly__grid {
     grid-template-columns: 1fr;
   }
 

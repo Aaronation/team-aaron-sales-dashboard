@@ -1,0 +1,6 @@
+单据编号,单据日期,客户名称,销售员,销售部门,物料编码,规格型号,数量,单价,价税合计,物料名称
+GAL26-11-02-001,2026-11-02,Harbour Retail,Aaron Chang,Galaxy - KA,UA18UKGDG,UA18UKGD,10,1000,10000,Momax 70W GaN
+GAL26-11-04-002,2026/11/04,Harbour Retail,Aaron Chang,Galaxy - KA,PX20,PX20,5,1000,5000,Power bank
+GAL26-11-06-003,06/11/2026,Kowloon Mart,Kelvin Lai,Galaxy - KA,PX20,PX20,9,1000,9000,Power bank
+GAL26-11-09-004,2026-11-09,Island Shop,Kenny Ma,Galaxy - KA,LED1,LED1,3,1000,3000,Desk lamp
+GAL26-11-12-005,2026-11-12,New Peak,Riley Cho,Galaxy,CAB1,CAB1,3,1000,3000,USB-C cable

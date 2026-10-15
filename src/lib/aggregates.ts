@@ -80,6 +80,15 @@ export function monthKeyFromDate(iso: string): string {
   return iso.slice(0, 7)
 }
 
+const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+export function formatMonthLabel(monthKey: string): string {
+  const [year, month] = monthKey.split('-')
+  const name = MONTH_SHORT[Number(month) - 1]
+  if (!year || !name) return monthKey
+  return `${name} ${year}`
+}
+
 export function listWeekKeys(items: LineItem[]): string[] {
   const set = new Set<string>()
   for (const r of items) {
@@ -114,6 +123,70 @@ export function filterItems(items: LineItem[], f: Filters): LineItem[] {
     if (f.weekKey !== 'all' && isoWeekKey(row.date) !== f.weekKey) return false
     return matchesDimFilters(row, f)
   })
+}
+
+/** Salesperson, department, and search only — not the review week. */
+export function filterIgnoringWeek(items: LineItem[], f: Filters): LineItem[] {
+  return items.filter((row) => matchesDimFilters(row, f))
+}
+
+export type MonthTotal = {
+  monthKey: string
+  label: string
+  revenue: number
+  quantity: number
+  lines: number
+  customers: number
+}
+
+export function monthlyTotals(items: LineItem[]): MonthTotal[] {
+  const map = new Map<string, MonthTotal & { customerSet: Set<string> }>()
+  for (const row of items) {
+    if (!row.date) continue
+    const monthKey = monthKeyFromDate(row.date)
+    let cur = map.get(monthKey)
+    if (!cur) {
+      cur = {
+        monthKey,
+        label: formatMonthLabel(monthKey),
+        revenue: 0,
+        quantity: 0,
+        lines: 0,
+        customers: 0,
+        customerSet: new Set(),
+      }
+      map.set(monthKey, cur)
+    }
+    cur.revenue += row.totalAmount || 0
+    cur.quantity += row.quantity || 0
+    cur.lines += 1
+    if (row.customer) cur.customerSet.add(row.customer)
+  }
+  return [...map.values()]
+    .map(({ customerSet, ...rest }) => ({ ...rest, customers: customerSet.size }))
+    .sort((a, b) => a.monthKey.localeCompare(b.monthKey))
+}
+
+export type SellOutShare = {
+  name: string
+  revenue: number
+  quantity: number
+  lines: number
+  /** Fraction of net sell-out (line totalAmount) in the set. */
+  share: number
+}
+
+/** Each salesperson’s share of sell-out. Sell-out is the line total (HKD). */
+export function sellOutShares(items: LineItem[]): SellOutShare[] {
+  const grouped = groupBy(items, (row) => row.salesperson || 'Unassigned')
+  const total = grouped.reduce((sum, row) => sum + row.revenue, 0)
+  return grouped.map((row) => ({
+    name: row.name,
+    revenue: row.revenue,
+    quantity: row.quantity,
+    lines: row.lines,
+    share: total !== 0 ? row.revenue / total : 0,
+  }))
 }
 
 /** Inclusive calendar date range (used for MoM same-period baseline). */
