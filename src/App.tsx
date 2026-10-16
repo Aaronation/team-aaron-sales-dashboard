@@ -32,7 +32,7 @@ import {
   weekDateRange,
   weekLabel,
 } from './lib/aggregates'
-import { customerBarColor } from './lib/palette'
+import { ALL_REPS_SKU_BAR, customerBarColor } from './lib/palette'
 import { mergeImportedItems, type ImportMode } from './lib/ingest'
 import { readImportFile, type LoadedImport } from './lib/readImportFile'
 import type { Filters, LineItem, SalesPayload } from './lib/types'
@@ -409,6 +409,12 @@ export default function App() {
             : `${filters.salesperson} top customers`
         }
         customerBarColor={customerBarColor(shares, filters.salesperson)}
+        skuTitle={
+          filters.salesperson === 'all'
+            ? 'Top product models (qty)'
+            : `${filters.salesperson} top product models`
+        }
+        skuBarColor={customerBarColor(shares, filters.salesperson, ALL_REPS_SKU_BAR)}
       />
 
       <LineTable rows={thisWeek} />

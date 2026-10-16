@@ -38,6 +38,8 @@ type Props = {
   daily: Daily[]
   customerTitle: string
   customerBarColor: string
+  skuTitle: string
+  skuBarColor: string
 }
 
 export function Charts({
@@ -47,6 +49,8 @@ export function Charts({
   daily,
   customerTitle,
   customerBarColor,
+  skuTitle,
+  skuBarColor,
 }: Props) {
   const repData = bySalesperson.map((s) => ({
     name: shortName(s.name),
@@ -131,7 +135,7 @@ export function Charts({
       </figure>
 
       <figure className="chart-panel">
-        <figcaption>Top product models (qty)</figcaption>
+        <figcaption>{skuTitle}</figcaption>
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={topSku}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(61,52,44,0.08)" />
@@ -149,7 +153,7 @@ export function Charts({
                 name === 'qty' ? Number(v).toLocaleString() : formatMoney(Number(v))
               }
             />
-            <Bar dataKey="qty" fill="#E0B44A" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="qty" fill={skuBarColor} radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </figure>

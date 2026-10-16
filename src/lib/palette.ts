@@ -10,8 +10,11 @@ export const SLICE_COLORS = [
   '#F3EAD8',
 ]
 
-/** Clay bar used when every salesperson is in view. */
+/** Clay bar used for customer charts when every salesperson is in view. */
 export const ALL_REPS_CUSTOMER_BAR = '#D8853F'
+
+/** Amber bar used for the SKU chart when every salesperson is in view. */
+export const ALL_REPS_SKU_BAR = '#E0B44A'
 
 export function sliceColorAt(index: number): string {
   return SLICE_COLORS[index % SLICE_COLORS.length]
@@ -24,9 +27,10 @@ export function sliceColorAt(index: number): string {
 export function customerBarColor(
   shares: { name: string; revenue: number }[],
   salesperson: string,
+  fallback = ALL_REPS_CUSTOMER_BAR,
 ): string {
-  if (salesperson === 'all') return ALL_REPS_CUSTOMER_BAR
+  if (salesperson === 'all') return fallback
   const index = shares.filter((share) => share.revenue > 0).findIndex((share) => share.name === salesperson)
-  if (index < 0) return ALL_REPS_CUSTOMER_BAR
+  if (index < 0) return fallback
   return sliceColorAt(index)
 }
