@@ -1,4 +1,5 @@
 import type { LineItem } from './types'
+import { WGAL_PARTNER_ALIASES } from './partnerAliases'
 
 /**
  * Turn tabular records into dashboard line items.
@@ -432,6 +433,57 @@ export function lineKey(row: LineItem): string {
   ].join('\u001f')
 }
 
+/**
+ * Map Kingdee 往来单位 (tradingPartner) → preferred customer label from rows that
+ * already carry a short alias (seed: Vision, ADDL, CTM, …). Used on Merge so new
+ * invoice lines that only have the full partner name join the same buyer.
+ */
+export function buildPartnerAliases(items: LineItem[]): Map<string, string> {
+  const tallies = new Map<string, Map<string, number>>()
+  for (const row of items) {
+    const partner = row.tradingPartner?.trim()
+    const customer = row.customer?.trim()
+    if (!partner || !customer) continue
+    let counts = tallies.get(partner)
+    if (!counts) {
+      counts = new Map()
+      tallies.set(partner, counts)
+    }
+    counts.set(customer, (counts.get(customer) ?? 0) + 1)
+  }
+  const aliases = new Map<string, string>()
+  for (const [partner, counts] of tallies) {
+    const ranked = [...counts.entries()].sort((a, b) => {
+      const aIsAlias = a[0] !== partner ? 1 : 0
+      const bIsAlias = b[0] !== partner ? 1 : 0
+      if (bIsAlias !== aIsAlias) return bIsAlias - aIsAlias
+      // Prefer short English brand labels (Vision, ADDL, CTM) over longer forms.
+      const latin = (name: string) => (name.match(/[A-Za-z]/g) ?? []).length
+      const aLatin = latin(a[0]) / Math.max(a[0].length, 1)
+      const bLatin = latin(b[0]) / Math.max(b[0].length, 1)
+      if (bLatin !== aLatin) return bLatin > aLatin ? 1 : -1
+      if (b[1] !== a[1]) return b[1] - a[1]
+      return a[0].length - b[0].length
+    })
+    const chosen = ranked[0]?.[0]
+    if (chosen && chosen !== partner) aliases.set(partner, chosen)
+  }
+  return aliases
+}
+
+/** Prefer the known alias when customer is empty or still the raw 往来单位 string. */
+export function applyPartnerAlias(row: LineItem, aliases: Map<string, string>): LineItem {
+  const partner = row.tradingPartner?.trim()
+  if (!partner) return row
+  const alias = aliases.get(partner)
+  if (!alias) return row
+  if (!row.customer || row.customer === partner) {
+    if (row.customer === alias) return row
+    return { ...row, customer: alias }
+  }
+  return row
+}
+
 export function mergeImportedItems(
   existing: LineItem[],
   incoming: LineItem[],
@@ -440,11 +492,19 @@ export function mergeImportedItems(
   if (mode === 'replace') {
     return { lineItems: incoming, added: incoming.length, replaced: 0 }
   }
+  // Rematch onto wGAL Trading Partner → Customer Name (165 pairs), then fill any
+  // gaps from seed tallies so Monthly top customers stay on short brands (Vision).
+  const aliases = new Map<string, string>([
+    ...buildPartnerAliases(existing),
+    ...Object.entries(WGAL_PARTNER_ALIASES),
+  ])
+  const normalizedExisting = existing.map((row) => applyPartnerAlias(row, aliases))
+  const normalizedIncoming = incoming.map((row) => applyPartnerAlias(row, aliases))
   const map = new Map<string, LineItem>()
-  for (const row of existing) map.set(lineKey(row), row)
+  for (const row of normalizedExisting) map.set(lineKey(row), row)
   let added = 0
   let replaced = 0
-  for (const row of incoming) {
+  for (const row of normalizedIncoming) {
     const key = lineKey(row)
     if (map.has(key)) replaced += 1
     else added += 1
