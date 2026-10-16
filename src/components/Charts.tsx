@@ -139,7 +139,7 @@ export function Charts({
         </ResponsiveContainer>
       </figure>
 
-      <figure className="chart-panel">
+      <figure className="chart-panel chart-panel--wide">
         <figcaption>{skuTitle}</figcaption>
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={topSku}>

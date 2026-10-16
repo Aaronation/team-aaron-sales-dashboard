@@ -8,11 +8,11 @@
   --ink-soft: #866c5a;
   /* Fills, borders, and bars. Too light for text on cream (~2.1:1). */
   --accent: #9aab78;
-  /* Olive text and pressed controls. #70823e is ~3.6:1 on cream, so this is darker (~5.0:1). */
-  --accent-deep: #5b6932;
+  /* Olive text, hover, and pressed controls. Forest, not the soft fill olive. */
+  --accent-deep: #70823e;
   --up: var(--accent-deep);
-  /* Clay text. #d8853f is ~2.4:1 on cream; bars and rules stay --clay. */
-  --down: #8c5629;
+  /* Clay text. #d8853f stays on bars and rules only. */
+  --down: #8b4a2e;
   --line: rgba(61, 52, 44, 0.1);
   --line-strong: rgba(61, 52, 44, 0.2);
   --surface: rgba(243, 234, 216, 0.92);
