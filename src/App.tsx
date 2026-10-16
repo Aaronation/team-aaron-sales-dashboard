@@ -36,6 +36,7 @@ import {
   weekDateRange,
   weekLabel,
 } from './lib/aggregates'
+import { mtdWorkingDays } from './lib/hkHolidays'
 import { ALL_REPS_SKU_BAR, customerBarColor } from './lib/palette'
 import { mergeImportedItems, type ImportMode } from './lib/ingest'
 import { readImportFile, type LoadedImport } from './lib/readImportFile'
@@ -151,6 +152,9 @@ export default function App() {
   const selectedRange =
     filters && filters.weekKey !== 'all' ? weekDateRange(filters.weekKey) : null
   const priorRange = selectedRange ? samePeriodLastMonth(selectedRange) : null
+  const workingDays = selectedRange
+    ? mtdWorkingDays(monthKeyFromDate(selectedRange.end), selectedRange.end)
+    : { elapsed: 0, total: 0, holidaysLoaded: false }
 
   const thisWeek = useMemo(() => {
     if (!payload || !filters) return []
@@ -409,6 +413,10 @@ export default function App() {
         monthLabel={monthKey}
         monthRevenue={months.find((month) => month.monthKey === monthKey)?.revenue ?? 0}
         reviewMonthLabel={formatMonthLabel(monthKey)}
+        mtdWorkingDays={workingDays.elapsed}
+        monthWorkingDays={workingDays.total}
+        workingDaysThrough={selectedRange ? selectedRange.end.slice(5) : '—'}
+        holidaysLoaded={workingDays.holidaysLoaded}
       />
 
       <MonthlySales
