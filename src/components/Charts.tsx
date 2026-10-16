@@ -64,11 +64,14 @@ export function Charts({
     delta: c.deltaPct,
   }))
 
-  const topSku = bySku.slice(0, 8).map((s) => ({
-    name: s.name,
-    qty: Math.round(s.quantity),
-    revenue: Math.round(s.revenue),
-  }))
+  const topSku = [...bySku]
+    .sort((a, b) => b.quantity - a.quantity || b.revenue - a.revenue)
+    .slice(0, 8)
+    .map((s) => ({
+      name: s.name,
+      qty: Math.round(s.quantity),
+      revenue: Math.round(s.revenue),
+    }))
 
   const trend = daily.map((d) => ({
     date: d.date.slice(5),
