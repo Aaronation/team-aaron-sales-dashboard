@@ -17,7 +17,7 @@ import {
   type SellOutShare,
 } from '../lib/aggregates'
 
-const SLICE_COLORS = ['#70823E', '#866C5A', '#E0B44A', '#D8853F', '#DFCF99', '#5a6a32', '#c4a36a', '#F3EAD8']
+const SLICE_COLORS = ['#9AAB78', '#866C5A', '#E0B44A', '#D8853F', '#DFCF99', '#b7c49a', '#c4a36a', '#F3EAD8']
 
 type Props = {
   months: MonthTotal[]
@@ -72,7 +72,7 @@ export function MonthlySales({
                   {chartRows.map((month) => (
                     <Cell
                       key={month.monthKey}
-                      fill={month.monthKey === activeMonthKey ? '#E0B44A' : '#70823E'}
+                      fill={month.monthKey === activeMonthKey ? '#E0B44A' : '#9AAB78'}
                     />
                   ))}
                 </Bar>
@@ -125,7 +125,7 @@ export function MonthlySales({
                       if (![cx, cy, midAngle, outer].every((n) => Number.isFinite(n))) return null
                       const radius = inner + (outer - inner) * 0.62
                       const rad = (-midAngle * Math.PI) / 180
-                      const light = new Set(['#dfcf99', '#e0b44a', '#f3ead8', '#d8853f'])
+                      const light = new Set(['#dfcf99', '#e0b44a', '#f3ead8', '#d8853f', '#9aab78'])
                       const fill = light.has(String(props.fill ?? '').toLowerCase()) ? '#3d342c' : '#fff'
                       return (
                         <text

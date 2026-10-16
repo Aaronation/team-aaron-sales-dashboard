@@ -63,7 +63,7 @@ export function Charts({ bySalesperson, byCustomer, bySku, daily }: Props) {
               fill="#DFCF99"
               radius={[4, 4, 0, 0]}
             />
-            <Bar dataKey="thisPeriod" name="This week" fill="#70823E" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="thisPeriod" name="This week" fill="#9AAB78" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </figure>

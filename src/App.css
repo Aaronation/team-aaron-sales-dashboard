@@ -28,7 +28,7 @@
   font-size: 0.85rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--accent-deep);
+  color: var(--accent);
 }
 
 .hero h1 {
@@ -62,7 +62,7 @@
   font-family: var(--font-display);
   font-size: 1.05rem;
   font-weight: 650;
-  color: var(--accent-deep);
+  color: var(--accent);
 }
 
 .hero__aside-meta {
@@ -172,7 +172,7 @@
 }
 
 .delta--new {
-  color: var(--accent-deep);
+  color: var(--accent);
 }
 
 .import-panel {
@@ -279,7 +279,20 @@
 .import-panel__note {
   margin: 0.65rem 0 0;
   font-size: 0.9rem;
+  color: var(--accent);
+}
+
+.import-panel button:hover:not(:disabled),
+.pager button:hover:not(:disabled) {
+  border-color: var(--accent-deep);
   color: var(--accent-deep);
+}
+
+.import-panel button:active:not(:disabled),
+.pager button:active:not(:disabled) {
+  background: var(--accent-deep);
+  border-color: var(--accent-deep);
+  color: var(--paper);
 }
 
 .import-panel__error {
@@ -348,7 +361,7 @@
 .share-list__pct {
   font-variant-numeric: tabular-nums;
   font-weight: 650;
-  color: var(--accent-deep);
+  color: var(--accent);
 }
 
 .rep-board {

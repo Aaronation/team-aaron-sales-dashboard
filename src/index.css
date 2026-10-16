@@ -6,9 +6,9 @@
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
   --ink: #3d342c;
   --ink-soft: #866c5a;
-  --accent: #70823e;
-  --accent-deep: #5a6a32;
-  --up: #70823e;
+  --accent: #9aab78;
+  --accent-deep: #70823e;
+  --up: #9aab78;
   --down: #d8853f;
   --line: rgba(61, 52, 44, 0.1);
   --line-strong: rgba(61, 52, 44, 0.2);
@@ -52,7 +52,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background:
-    radial-gradient(1200px 520px at 8% -12%, rgba(112, 130, 62, 0.18), transparent 56%),
+    radial-gradient(1200px 520px at 8% -12%, rgba(154, 171, 120, 0.28), transparent 56%),
     radial-gradient(880px 440px at 100% 0%, rgba(216, 133, 63, 0.18), transparent 52%),
     linear-gradient(180deg, var(--bg0), var(--bg1) 42%, var(--bg2));
   background-attachment: fixed;
