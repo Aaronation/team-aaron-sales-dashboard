@@ -326,8 +326,72 @@
   color: var(--ink-soft);
 }
 
-.monthly-table tr.is-active td {
+.monthly-table tr.is-active td,
+.monthly-table th.is-active,
+.monthly-table td.is-active {
   background: rgba(224, 180, 74, 0.22);
+}
+
+.rep-targets {
+  margin-top: var(--space-6);
+}
+
+.rep-targets h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.rep-targets .monthly__caption {
+  max-width: 52rem;
+  margin-bottom: var(--space-4);
+}
+
+.rep-targets__block {
+  margin-top: var(--space-4);
+}
+
+.rep-targets__block + .rep-targets__block {
+  margin-top: var(--space-5);
+}
+
+.rep-targets__block h4 {
+  margin: 0 0 0.4rem;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.rep-targets__achieve {
+  min-width: 8.5rem;
+}
+
+.rep-targets__bar {
+  display: block;
+  height: 6px;
+  margin-top: 0.3rem;
+  background: var(--bg1);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.rep-targets__bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 99px;
+}
+
+.rep-targets__sub {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  font-weight: 400;
 }
 
 .monthly-table tfoot th,

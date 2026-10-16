@@ -20,6 +20,7 @@ import {
   monthKeyFromDate,
   monthlyTotals,
   pctDelta,
+  repMonthAchievements,
   samePeriodLastMonth,
   sellOutShares,
   sumQty,
@@ -203,6 +204,16 @@ export default function App() {
     return base.filter((row) => row.date != null && monthKeyFromDate(row.date) === monthKey)
   }, [payload, filters])
   const shares = useMemo(() => sellOutShares(shareRows), [shareRows])
+  const repRows = useMemo(() => {
+    if (!payload || !filters) return []
+    const base = filterIgnoringWeek(payload.lineItems, {
+      weekKey: filters.weekKey,
+      salesperson: 'all',
+      department: filters.department,
+      query: filters.query,
+    })
+    return repMonthAchievements(base)
+  }, [payload, filters])
 
   async function handleImport(file: File, mode: ImportMode) {
     if (!payload || importingRef.current) return
@@ -365,6 +376,7 @@ export default function App() {
         shareLabel={shareMonthKey ? formatMonthLabel(shareMonthKey) : 'All loaded months'}
         scopeNote={monthlyScopeNote(filters)}
         showTarget={filters.salesperson === 'all'}
+        repRows={repRows}
       />
 
       <RepBoard rows={bySp} />

@@ -12,8 +12,10 @@ import {
 } from 'recharts'
 import {
   formatMoney,
+  formatMonthLabel,
   MONTHLY_TEAM_TARGETS,
   type MonthTotal,
+  type RepAchievement,
   type SellOutShare,
 } from '../lib/aggregates'
 
@@ -26,6 +28,12 @@ type Props = {
   shareLabel: string
   scopeNote: string
   showTarget: boolean
+  repRows: RepAchievement[]
+}
+
+function formatAchieve(achieve: number | null): string {
+  if (achieve == null) return '—'
+  return `${(achieve * 100).toFixed(1)}%`
 }
 
 export function MonthlySales({
@@ -35,6 +43,7 @@ export function MonthlySales({
   shareLabel,
   scopeNote,
   showTarget,
+  repRows,
 }: Props) {
   const chartRows = months.map((month) => ({
     ...month,
@@ -228,6 +237,114 @@ export function MonthlySales({
           ) : null}
         </table>
       </div>
+
+      <RepTargets rows={repRows} activeMonthKey={activeMonthKey} />
     </section>
+  )
+}
+
+function RepTargets({
+  rows,
+  activeMonthKey,
+}: {
+  rows: RepAchievement[]
+  activeMonthKey: string | null
+}) {
+  if (rows.length === 0 || rows.every((row) => row.months.length === 0)) return null
+  const monthColumns = rows[0]?.months ?? []
+  const reviewLabel = activeMonthKey ? formatMonthLabel(activeMonthKey) : null
+  const reviewRows = activeMonthKey
+    ? rows.flatMap((row) => {
+        const figure = row.months.find((month) => month.monthKey === activeMonthKey)
+        return figure ? [{ row, figure }] : []
+      })
+    : []
+
+  return (
+    <div className="rep-targets">
+      <h3>Monthly target by salesperson</h3>
+      <p className="monthly__caption">
+        Targets are the team month target × split: Aaron Chang 49%, Kelvin Lai 31%, Kenny Ma 20%.
+        Achieve rate is that rep’s month sell-out divided by their target. Reps without a split,
+        including Unassigned, show sell-out against —. The salesperson filter does not hide other
+        reps. Targets are team-level and are not resized by the department filter.
+      </p>
+
+      {reviewRows.length > 0 ? (
+        <div className="rep-targets__block">
+          <h4>{reviewLabel} · review month</h4>
+          <div className="table-scroll">
+            <table className="monthly-table">
+              <thead>
+                <tr>
+                  <th>Salesperson</th>
+                  <th>Sell-out (HKD)</th>
+                  <th>Target</th>
+                  <th>Achieve</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reviewRows.map(({ row, figure }) => (
+                  <tr key={row.name}>
+                    <td>{row.name}</td>
+                    <td className="mono">{formatMoney(figure.revenue)}</td>
+                    <td className="mono">{figure.target == null ? '—' : formatMoney(figure.target)}</td>
+                    <td className="rep-targets__achieve">
+                      <span>{formatAchieve(figure.achieve)}</span>
+                      {figure.achieve != null ? (
+                        <span className="rep-targets__bar" aria-hidden="true">
+                          <span style={{ width: `${Math.min(figure.achieve, 1) * 100}%` }} />
+                        </span>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
+
+      {monthColumns.length >= 2 ? (
+        <div className="rep-targets__block">
+          <h4>Achieve by month</h4>
+          <div className="table-scroll">
+            <table className="monthly-table">
+              <thead>
+                <tr>
+                  <th>Salesperson</th>
+                  {monthColumns.map((month) => (
+                    <th
+                      key={month.monthKey}
+                      className={month.monthKey === activeMonthKey ? 'is-active' : undefined}
+                    >
+                      {month.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.name}>
+                    <td>{row.name}</td>
+                    {row.months.map((month) => (
+                      <td
+                        key={month.monthKey}
+                        className={month.monthKey === activeMonthKey ? 'is-active' : undefined}
+                      >
+                        <span>{formatAchieve(month.achieve)}</span>
+                        <span className="rep-targets__sub">
+                          {month.target == null ? 'no target' : formatMoney(month.target)}
+                        </span>
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
+    </div>
   )
 }

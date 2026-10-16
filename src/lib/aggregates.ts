@@ -189,6 +189,76 @@ export function sellOutShares(items: LineItem[]): SellOutShare[] {
   }))
 }
 
+export type RepMonthFigure = {
+  monthKey: string
+  label: string
+  revenue: number
+  target: number | null
+  achieve: number | null
+}
+
+export type RepAchievement = {
+  name: string
+  hasSplit: boolean
+  months: RepMonthFigure[]
+}
+
+/** Per-rep monthly target: team month target × DEFAULT_SPLITS. Null when either is missing. */
+export function repMonthTarget(name: string, monthKey: string): number | null {
+  const team = MONTHLY_TEAM_TARGETS[monthKey]
+  const split = DEFAULT_SPLITS[name]
+  if (team == null || split == null) return null
+  return team * split
+}
+
+/**
+ * Sell-out, derived target, and achieve rate per salesperson and calendar month.
+ * Split reps stay in DEFAULT_SPLITS order even at zero revenue. Other reps follow
+ * by total revenue and have a null target (shown as —).
+ */
+export function repMonthAchievements(items: LineItem[]): RepAchievement[] {
+  const revenue = new Map<string, Map<string, number>>()
+  const monthKeys = new Set<string>()
+  for (const row of items) {
+    if (!row.date) continue
+    const name = row.salesperson || 'Unassigned'
+    const monthKey = monthKeyFromDate(row.date)
+    monthKeys.add(monthKey)
+    let byMonth = revenue.get(name)
+    if (!byMonth) {
+      byMonth = new Map()
+      revenue.set(name, byMonth)
+    }
+    byMonth.set(monthKey, (byMonth.get(monthKey) ?? 0) + (row.totalAmount || 0))
+  }
+  const months = [...monthKeys].sort()
+  const extras = [...revenue.keys()]
+    .filter((name) => DEFAULT_SPLITS[name] == null)
+    .sort((a, b) => {
+      const total = (rep: string) =>
+        [...(revenue.get(rep)?.values() ?? [])].reduce((sum, amount) => sum + amount, 0)
+      return total(b) - total(a) || a.localeCompare(b)
+    })
+  return [...Object.keys(DEFAULT_SPLITS), ...extras].map((name) => {
+    const byMonth = revenue.get(name)
+    return {
+      name,
+      hasSplit: DEFAULT_SPLITS[name] != null,
+      months: months.map((monthKey) => {
+        const monthRevenue = byMonth?.get(monthKey) ?? 0
+        const target = repMonthTarget(name, monthKey)
+        return {
+          monthKey,
+          label: formatMonthLabel(monthKey),
+          revenue: monthRevenue,
+          target,
+          achieve: target != null && target > 0 ? monthRevenue / target : null,
+        }
+      }),
+    }
+  })
+}
+
 /** Inclusive calendar date range (used for MoM same-period baseline). */
 export function filterByDateRange(
   items: LineItem[],
