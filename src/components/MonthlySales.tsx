@@ -247,8 +247,9 @@ export function MonthlySales({
       <figure className="chart-panel monthly-customers">
         <figcaption>Days in review month · {shareLabel}</figcaption>
         <p className="monthly__caption">
-          Daily sell-out for the full calendar month of the review week. Days with no sales are
-          zero. The axis stops on the last day that has sales.
+          Working-day sell-out for the review month. Weekends and Hong Kong public holidays are
+          left off the axis. Working days with no sales are zero. The axis stops on the last day
+          that has sales.
         </p>
         {dayRows.length === 0 ? (
           <p className="monthly__empty">No daily sales in {shareLabel}.</p>

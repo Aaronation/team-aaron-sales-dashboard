@@ -1,3 +1,4 @@
+import { isWorkingDay } from './hkHolidays'
 import type { Filters, LineItem, Targets } from './types'
 
 export const MONTHLY_TEAM_TARGETS: Record<string, number> = {
@@ -397,9 +398,10 @@ export function dailyTrend(items: LineItem[]): { date: string; revenue: number; 
 }
 
 /**
- * Every calendar day from the 1st of `monthKey` through the last day that has
- * sales in that month. Days with no invoices are zero. Days after the data ends
- * are omitted.
+ * Working days from the 1st of `monthKey` through the last day that has sales
+ * in that month. A working day is Monday–Friday and not a Hong Kong public
+ * holiday (`isWorkingDay`). Weekends and holidays are omitted. Working days
+ * with no invoices are zero. Days after the data ends are omitted.
  */
 export function monthDaily(
   items: LineItem[],
@@ -416,7 +418,9 @@ export function monthDaily(
   const end = new Date(`${last}T12:00:00Z`)
   while (cursor.getTime() <= end.getTime()) {
     const date = cursor.toISOString().slice(0, 10)
-    out.push(byDay.get(date) ?? { date, revenue: 0, quantity: 0 })
+    if (isWorkingDay(date)) {
+      out.push(byDay.get(date) ?? { date, revenue: 0, quantity: 0 })
+    }
     cursor.setUTCDate(cursor.getUTCDate() + 1)
   }
   return out
