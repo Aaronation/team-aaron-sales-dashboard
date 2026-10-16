@@ -93,7 +93,7 @@ for (const [field, aliases] of Object.entries(FIELD_ALIASES) as [Field, string[]
 }
 
 export const IMPORT_COLUMN_HINT =
-  'Expected columns: Date (日期 / 单据日期 / 业务日期) and Total Amount (金额 / 价税合计 / 销售金额), or Quantity × Unit Price. Salesperson (销售员 / 业务员) drives the sell-out pie. Optional: Invoice (单据编号), Customer (客户), Department (销售部门), SKU (物料编码), product model (产品型号 / 规格型号). Ambiguous numeric dates are read as day/month/year.'
+  'Expected columns: Date (日期 / 单据日期 / 业务日期) and Total Amount (金额 / 价税合计 / 销售金额), or Quantity × Unit Price. Salesperson (销售员 / 业务员) drives the sell-out pie. Optional: Invoice (单据编号), Customer (客户 / 客户名称; 往来单位 is used when that is empty), Department (销售部门), SKU (物料编码), product model (产品型号 / 规格型号). Ambiguous numeric dates are read as day/month/year.'
 
 export function normHeader(value: string): string {
   return value
@@ -346,7 +346,9 @@ function recordToLineItem(
   if (!date || total == null) return null
 
   const invoice = textValue(record.invoice) ?? ''
-  const customer = textValue(record.customer)
+  const tradingPartner = textValue(record.tradingPartner)
+  // Kingdee invoice lists name the buyer in 往来单位 and often leave 客户 empty.
+  const customer = textValue(record.customer) ?? tradingPartner
   if (isTotalLabel(invoice) || isTotalLabel(customer)) return null
 
   const parts = calendarParts(date)
@@ -354,7 +356,7 @@ function recordToLineItem(
   return {
     source: textValue(record.source) ?? sourceDefault,
     invoice,
-    tradingPartner: textValue(record.tradingPartner),
+    tradingPartner,
     customer,
     date,
     year: parts.year,

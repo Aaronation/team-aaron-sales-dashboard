@@ -58,7 +58,7 @@ Ambiguous numeric dates (`06/11/2026`) are read as day/month/year.
 | Quantity | no | Quantity, 数量, 实发数量 |
 | Unit price | no | Unit Price, 单价, 含税单价 |
 | Invoice | no | Invoice, 单据编号, 发票号 |
-| Customer | no | Customer Name, 客户, 客户名称 |
+| Customer | no | Customer Name, 客户, 客户名称. If those are empty, 往来单位 / 交易对象 is copied in (trading partner is still kept). |
 | Department | no | Sales Department, 部门, 销售部门 |
 | SKU | no | SKU, 物料编码, 商品编码 |
 | Product model | no | 产品型号, 规格型号, Product Model |
