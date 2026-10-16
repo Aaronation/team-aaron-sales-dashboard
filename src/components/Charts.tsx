@@ -152,12 +152,8 @@ export function Charts({
               height={64}
             />
             <YAxis />
-            <Tooltip
-              formatter={(v, name) =>
-                name === 'qty' ? Number(v).toLocaleString() : formatMoney(Number(v))
-              }
-            />
-            <Bar dataKey="qty" fill={skuBarColor} radius={[4, 4, 0, 0]} />
+            <Tooltip formatter={(value) => [`${Number(value).toLocaleString()} units`, 'Qty']} />
+            <Bar dataKey="qty" name="Qty" fill={skuBarColor} radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </figure>

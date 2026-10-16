@@ -314,9 +314,7 @@ export function MonthlySales({
               />
               <YAxis />
               <Tooltip
-                formatter={(value, name) =>
-                  name === 'qty' ? Number(value).toLocaleString() : formatMoney(Number(value))
-                }
+                formatter={(value) => [`${Number(value).toLocaleString()} units`, 'Qty']}
               />
               <Bar dataKey="qty" name="Qty" fill={modelBarColor} radius={[4, 4, 0, 0]} />
             </BarChart>
