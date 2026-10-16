@@ -1,9 +1,9 @@
 import type { NamedDelta } from '../lib/aggregates'
-import { formatMoney, formatPct } from '../lib/aggregates'
+import { formatMoney, formatPct, shortName } from '../lib/aggregates'
 
-type Props = { rows: NamedDelta[] }
+type Props = { rows: NamedDelta[]; invoiceCounts: Map<string, number> }
 
-export function RepBoard({ rows }: Props) {
+export function RepBoard({ rows, invoiceCounts }: Props) {
   return (
     <section className="rep-board" aria-label="Rep month-over-month">
       <header>
@@ -23,9 +23,10 @@ export function RepBoard({ rows }: Props) {
           return (
             <li key={r.name}>
               <div>
-                <strong>{r.name}</strong>
+                <strong>{shortName(r.name)}</strong>
                 <span className="muted">
-                  {r.lines} lines · {r.quantity.toLocaleString()} units
+                  {(invoiceCounts.get(r.name) ?? 0).toLocaleString()} invoices ·{' '}
+                  {r.quantity.toLocaleString()} units
                 </span>
               </div>
               <div className="rep-board__nums">

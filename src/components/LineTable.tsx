@@ -1,12 +1,67 @@
 import { useMemo, useState } from 'react'
 import type { LineItem } from '../lib/types'
-import { formatMoney } from '../lib/aggregates'
+import { displayCustomer, formatMoney, shortName } from '../lib/aggregates'
 
 type Props = { rows: LineItem[] }
+
+type InvoiceRow = {
+  invoice: string
+  date: string | null
+  customer: string | null
+  salesperson: string | null
+  quantity: number
+  totalAmount: number
+}
 
 type SortKey = 'date' | 'totalAmount' | 'quantity' | 'customer' | 'salesperson'
 
 const PAGE = 40
+
+function joined(values: Set<string>): string | null {
+  const list = [...values]
+  if (list.length === 0) return null
+  if (list.length === 1) return list[0]
+  return list.sort((a, b) => a.localeCompare(b)).join(', ')
+}
+
+/** One row per invoice. Revenue and quantity are the sums of that invoice’s lines. */
+function invoicesFromLines(rows: LineItem[]): InvoiceRow[] {
+  const map = new Map<
+    string,
+    InvoiceRow & { dates: Set<string>; customers: Set<string>; reps: Set<string> }
+  >()
+  for (const row of rows) {
+    const invoice = row.invoice || '(no invoice)'
+    let cur = map.get(invoice)
+    if (!cur) {
+      cur = {
+        invoice,
+        date: row.date,
+        customer: row.customer,
+        salesperson: row.salesperson,
+        quantity: 0,
+        totalAmount: 0,
+        dates: new Set(),
+        customers: new Set(),
+        reps: new Set(),
+      }
+      map.set(invoice, cur)
+    }
+    cur.quantity += row.quantity || 0
+    cur.totalAmount += row.totalAmount || 0
+    if (row.date) cur.dates.add(row.date)
+    if (row.customer) cur.customers.add(row.customer)
+    if (row.salesperson) cur.reps.add(row.salesperson)
+  }
+  return [...map.values()].map((cur) => ({
+    invoice: cur.invoice,
+    date: [...cur.dates].sort()[0] ?? cur.date,
+    customer: joined(cur.customers),
+    salesperson: joined(cur.reps),
+    quantity: cur.quantity,
+    totalAmount: cur.totalAmount,
+  }))
+}
 
 export function LineTable({ rows }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>('date')
@@ -14,7 +69,7 @@ export function LineTable({ rows }: Props) {
   const [page, setPage] = useState(0)
 
   const sorted = useMemo(() => {
-    const copy = [...rows]
+    const copy = invoicesFromLines(rows)
     copy.sort((a, b) => {
       const av = a[sortKey] ?? ''
       const bv = b[sortKey] ?? ''
@@ -46,7 +101,7 @@ export function LineTable({ rows }: Props) {
       <header className="table-wrap__head">
         <h2>Week line detail</h2>
         <p>
-          Page {safePage + 1} / {pageCount} · {rows.length.toLocaleString()} rows
+          Page {safePage + 1} / {pageCount} · {sorted.length.toLocaleString()} invoices
         </p>
       </header>
       <div className="table-scroll">
@@ -69,7 +124,6 @@ export function LineTable({ rows }: Props) {
                   Salesperson
                 </button>
               </th>
-              <th>SKU / Model</th>
               <th>
                 <button type="button" onClick={() => toggle('quantity')}>
                   Qty
@@ -77,26 +131,20 @@ export function LineTable({ rows }: Props) {
               </th>
               <th>
                 <button type="button" onClick={() => toggle('totalAmount')}>
-                  Amount (HKD)
+                  Revenue
                 </button>
               </th>
             </tr>
           </thead>
           <tbody>
-            {slice.map((r, i) => (
-              <tr key={`${r.invoice}-${r.sku}-${r.date}-${i}`}>
+            {slice.map((r) => (
+              <tr key={r.invoice}>
                 <td>{r.date}</td>
                 <td className="mono">{r.invoice}</td>
-                <td>{r.customer}</td>
-                <td>{r.salesperson}</td>
-                <td>
-                  <span className="mono">{r.productModel || r.sku}</span>
-                  {r.productName ? (
-                    <span className="muted"> · {r.productName.slice(0, 40)}</span>
-                  ) : null}
-                </td>
-                <td>{r.quantity}</td>
-                <td>{formatMoney(r.totalAmount)}</td>
+                <td title={r.customer ?? undefined}>{r.customer ? displayCustomer(r.customer) : ''}</td>
+                <td>{r.salesperson ? shortName(r.salesperson) : ''}</td>
+                <td>{Math.round(r.quantity).toLocaleString()}</td>
+                <td className="mono">{formatMoney(r.totalAmount)}</td>
               </tr>
             ))}
           </tbody>

@@ -9,10 +9,16 @@ type Props = {
   customers: number
   prevCustomers: number
   quantity: number
-  lines: number
+  invoices: number
   mtdRevenue: number
   monthTarget: number
   monthLabel: string
+  monthRevenue: number
+  reviewMonthLabel: string
+  mtdWorkingDays: number
+  monthWorkingDays: number
+  workingDaysThrough: string
+  holidaysLoaded: boolean
 }
 
 function Delta({ value }: { value: number | null }) {
@@ -30,10 +36,16 @@ export function KpiRow({
   customers,
   prevCustomers,
   quantity,
-  lines,
+  invoices,
   mtdRevenue,
   monthTarget,
   monthLabel,
+  monthRevenue,
+  reviewMonthLabel,
+  mtdWorkingDays,
+  monthWorkingDays,
+  workingDaysThrough,
+  holidaysLoaded,
 }: Props) {
   const mtdPct = monthTarget > 0 ? mtdRevenue / monthTarget : 0
   const custDelta =
@@ -55,8 +67,10 @@ export function KpiRow({
           <Delta value={delta} />
         </p>
         <p className="kpis__hint">
-          {lines.toLocaleString()} lines · {quantity.toLocaleString()} units
+          {invoices.toLocaleString()} invoices · {quantity.toLocaleString()} units
         </p>
+        <p className="kpis__label kpis__label--sub">Monthly revenue · {reviewMonthLabel}</p>
+        <p className="kpis__month">{formatMoney(monthRevenue)}</p>
       </div>
       <div>
         <p className="kpis__label">Unique customers</p>
@@ -73,6 +87,17 @@ export function KpiRow({
           <span className="kpis__sub"> / {formatMoney(monthTarget)}</span>
         </p>
         <p className="kpis__hint">{(mtdPct * 100).toFixed(1)}% of monthly target</p>
+      </div>
+      <div>
+        <p className="kpis__label">MTD working days · {reviewMonthLabel}</p>
+        <p className="kpis__value">
+          {mtdWorkingDays}
+          <span className="kpis__sub"> of {monthWorkingDays}</span>
+        </p>
+        <p className="kpis__hint">Mon–Fri through {workingDaysThrough}</p>
+        <p className="kpis__hint">
+          {holidaysLoaded ? 'HK public holidays excluded' : 'Weekends excluded'}
+        </p>
       </div>
     </section>
   )
