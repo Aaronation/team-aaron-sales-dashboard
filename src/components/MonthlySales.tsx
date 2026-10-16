@@ -106,7 +106,7 @@ export function MonthlySales({
   }))
   const topModels = [...monthModels]
     .sort((a, b) => b.quantity - a.quantity || b.revenue - a.revenue)
-    .slice(0, 8)
+    .slice(0, 10)
     .map((model) => ({
       name: model.name,
       qty: Math.round(model.quantity),
@@ -295,7 +295,7 @@ export function MonthlySales({
       <figure className="chart-panel monthly-customers">
         <figcaption>{modelTitle}</figcaption>
         <p className="monthly__caption">
-          Top 8 product models by quantity for the review month. Follows the salesperson,
+          Top 10 product models by quantity for the review month. Follows the salesperson,
           department, and search filters.
         </p>
         {topModels.length === 0 ? (
