@@ -15,11 +15,28 @@ import {
   formatMonthLabel,
   MONTHLY_TEAM_TARGETS,
   type MonthTotal,
+  type NamedTotal,
   type RepAchievement,
   type SellOutShare,
 } from '../lib/aggregates'
 
 const SLICE_COLORS = ['#9AAB78', '#866C5A', '#E0B44A', '#D8853F', '#DFCF99', '#b7c49a', '#c4a36a', '#F3EAD8']
+
+function CustomerTick({
+  x = 0,
+  y = 0,
+  payload,
+}: {
+  x?: string | number
+  y?: string | number
+  payload?: { value?: string }
+}) {
+  return (
+    <text x={x} y={y} dy={4} textAnchor="end" fill="#3d342c" fontSize={12}>
+      {payload?.value}
+    </text>
+  )
+}
 
 type Props = {
   months: MonthTotal[]
@@ -29,6 +46,7 @@ type Props = {
   scopeNote: string
   showTarget: boolean
   repRows: RepAchievement[]
+  monthCustomers: NamedTotal[]
 }
 
 function formatAchieve(achieve: number | null): string {
@@ -44,6 +62,7 @@ export function MonthlySales({
   scopeNote,
   showTarget,
   repRows,
+  monthCustomers,
 }: Props) {
   const chartRows = months.map((month) => ({
     ...month,
@@ -58,6 +77,11 @@ export function MonthlySales({
     { revenue: 0, quantity: 0, lines: 0 },
   )
   const pieRows = shares.filter((share) => share.revenue > 0)
+  const topCustomers = monthCustomers.slice(0, 10).map((customer) => ({
+    name: customer.name.length > 22 ? customer.name.slice(0, 21) + '…' : customer.name,
+    fullName: customer.name,
+    revenue: Math.round(customer.revenue),
+  }))
 
   return (
     <section className="monthly" aria-label="Monthly sales">
@@ -185,6 +209,33 @@ export function MonthlySales({
           )}
         </figure>
       </div>
+
+      <figure className="chart-panel monthly-customers">
+        <figcaption>Top customers · {shareLabel}</figcaption>
+        <p className="monthly__caption">
+          Top 10 by sell-out (HKD) for the review month. Follows the salesperson, department, and
+          search filters.
+        </p>
+        {topCustomers.length === 0 ? (
+          <p className="monthly__empty">No customers in {shareLabel}.</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={360}>
+            <BarChart data={topCustomers} layout="vertical" margin={{ left: 8, right: 16 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(61,52,44,0.08)" horizontal={false} />
+              <XAxis type="number" tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} />
+              <YAxis type="category" dataKey="name" width={196} tick={CustomerTick} />
+              <Tooltip
+                formatter={(value) => formatMoney(Number(value))}
+                labelFormatter={(_, payload) => {
+                  const row = payload?.[0]?.payload as { fullName?: string } | undefined
+                  return row?.fullName ?? ''
+                }}
+              />
+              <Bar dataKey="revenue" name="Sell-out" fill="#D8853F" radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </figure>
 
       <div className="table-scroll">
         <table className="monthly-table">

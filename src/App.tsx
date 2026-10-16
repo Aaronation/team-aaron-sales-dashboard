@@ -14,6 +14,7 @@ import {
   filterMtdThroughWeek,
   formatMonthLabel,
   formatRangeLabel,
+  groupBy,
   groupByWithPrior,
   isoWeekKey,
   listWeekKeys,
@@ -190,6 +191,18 @@ export default function App() {
     filters && filters.weekKey !== 'all' && selectedRange
       ? monthKeyFromDate(selectedRange.end)
       : null
+  const monthCustomers = useMemo(() => {
+    if (!payload || !filters || filters.weekKey === 'all') return []
+    const range = weekDateRange(filters.weekKey)
+    if (!range) return []
+    const monthKey = monthKeyFromDate(range.end)
+    return groupBy(
+      filterIgnoringWeek(payload.lineItems, filters).filter(
+        (row) => row.date != null && monthKeyFromDate(row.date) === monthKey,
+      ),
+      (row) => row.customer,
+    )
+  }, [payload, filters])
   const shareRows = useMemo(() => {
     if (!payload || !filters) return []
     const range = filters.weekKey === 'all' ? null : weekDateRange(filters.weekKey)
@@ -377,6 +390,7 @@ export default function App() {
         scopeNote={monthlyScopeNote(filters)}
         showTarget={filters.salesperson === 'all'}
         repRows={repRows}
+        monthCustomers={monthCustomers}
       />
 
       <RepBoard rows={bySp} />

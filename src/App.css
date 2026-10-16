@@ -316,6 +316,10 @@
   margin-bottom: var(--space-4);
 }
 
+.monthly-customers {
+  margin-bottom: var(--space-4);
+}
+
 .monthly__caption {
   margin-bottom: 0.25rem;
   font-size: 0.82rem;
