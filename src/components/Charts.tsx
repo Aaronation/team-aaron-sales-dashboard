@@ -12,6 +12,7 @@ import {
 } from 'recharts'
 import type { NamedDelta } from '../lib/aggregates'
 import { formatMoney, formatPct, shortName, tickLabel } from '../lib/aggregates'
+import { GRID, INK, OLIVE, SAGE, TAUPE } from '../lib/palette'
 
 type Daily = { date: string; revenue: number; quantity: number }
 
@@ -25,7 +26,7 @@ function CustomerTick({
   payload?: { value?: string }
 }) {
   return (
-    <text x={x} y={y} dy={4} textAnchor="end" fill="#3d342c" fontSize={11}>
+    <text x={x} y={y} dy={4} textAnchor="end" fill={INK} fontSize={11}>
       {payload?.value}
     </text>
   )
@@ -67,7 +68,7 @@ export function Charts({
 
   const topSku = [...bySku]
     .sort((a, b) => b.quantity - a.quantity || b.revenue - a.revenue)
-    .slice(0, 8)
+    .slice(0, 10)
     .map((s) => ({
       name: s.name,
       qty: Math.round(s.quantity),
@@ -85,18 +86,18 @@ export function Charts({
         <figcaption>Reps · this week vs same period last month</figcaption>
         <ResponsiveContainer width="100%" height={260}>
           <BarChart data={repData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(61,52,44,0.08)" />
+            <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
             <XAxis dataKey="name" />
             <YAxis tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} width={48} />
             <Tooltip formatter={(v) => formatMoney(Number(v))} />
-            <Legend />
+            <Legend formatter={(value) => <span style={{ color: INK }}>{value}</span>} />
             <Bar
               dataKey="priorPeriod"
               name="Same period last month"
-              fill="#DFCF99"
+              fill={SAGE}
               radius={[4, 4, 0, 0]}
             />
-            <Bar dataKey="thisPeriod" name="This week" fill="#9AAB78" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="thisPeriod" name="This week" fill={OLIVE} radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </figure>
@@ -105,11 +106,11 @@ export function Charts({
         <figcaption>Days in review week</figcaption>
         <ResponsiveContainer width="100%" height={260}>
           <LineChart data={trend}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(61,52,44,0.08)" />
+            <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
             <XAxis dataKey="date" tick={{ fontSize: 11 }} />
             <YAxis tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} width={48} />
             <Tooltip formatter={(v) => formatMoney(Number(v))} />
-            <Line type="monotone" dataKey="revenue" stroke="#866C5A" strokeWidth={2.5} dot={{ r: 3 }} />
+            <Line type="monotone" dataKey="revenue" stroke={TAUPE} strokeWidth={2.5} dot={{ r: 3 }} />
           </LineChart>
         </ResponsiveContainer>
       </figure>
@@ -118,7 +119,7 @@ export function Charts({
         <figcaption>{customerTitle}</figcaption>
         <ResponsiveContainer width="100%" height={360}>
           <BarChart data={topCust} layout="vertical" margin={{ left: 4, right: 12 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(61,52,44,0.08)" horizontal={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke={GRID} horizontal={false} />
             <XAxis type="number" tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
             <YAxis type="category" dataKey="name" width={118} tick={CustomerTick} />
             <Tooltip
@@ -142,7 +143,7 @@ export function Charts({
         <figcaption>{skuTitle}</figcaption>
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={topSku}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(61,52,44,0.08)" />
+            <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
             <XAxis
               dataKey="name"
               tick={{ fontSize: 10 }}

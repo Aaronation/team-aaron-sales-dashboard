@@ -23,7 +23,7 @@ import {
   type RepAchievement,
   type SellOutShare,
 } from '../lib/aggregates'
-import { sliceColorAt } from '../lib/palette'
+import { AMBER, GRID, INK, LIGHT_SLICE_FILLS, OLIVE, TAUPE, sliceColorAt } from '../lib/palette'
 
 function CustomerTick({
   x = 0,
@@ -35,7 +35,7 @@ function CustomerTick({
   payload?: { value?: string }
 }) {
   return (
-    <text x={x} y={y} dy={4} textAnchor="end" fill="#3d342c" fontSize={12}>
+    <text x={x} y={y} dy={4} textAnchor="end" fill={INK} fontSize={12}>
       {payload?.value}
     </text>
   )
@@ -131,7 +131,7 @@ export function MonthlySales({
           ) : (
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={chartRows}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(61,52,44,0.08)" />
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
                 <XAxis dataKey="label" tick={{ fontSize: 12 }} />
                 <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} width={48} />
                 <Tooltip formatter={(value) => formatMoney(Number(value))} />
@@ -139,7 +139,7 @@ export function MonthlySales({
                   {chartRows.map((month) => (
                     <Cell
                       key={month.monthKey}
-                      fill={month.monthKey === activeMonthKey ? '#E0B44A' : '#9AAB78'}
+                      fill={month.monthKey === activeMonthKey ? AMBER : OLIVE}
                     />
                   ))}
                 </Bar>
@@ -168,7 +168,7 @@ export function MonthlySales({
                     cy="50%"
                     outerRadius={92}
                     paddingAngle={1}
-                    stroke="#866C5A"
+                    stroke={TAUPE}
                     isAnimationActive={false}
                     labelLine={false}
                     label={(raw) => {
@@ -192,8 +192,7 @@ export function MonthlySales({
                       if (![cx, cy, midAngle, outer].every((n) => Number.isFinite(n))) return null
                       const radius = inner + (outer - inner) * 0.62
                       const rad = (-midAngle * Math.PI) / 180
-                      const light = new Set(['#dfcf99', '#e0b44a', '#f3ead8', '#d8853f', '#9aab78'])
-                      const fill = light.has(String(props.fill ?? '').toLowerCase()) ? '#3d342c' : '#fff'
+                      const fill = LIGHT_SLICE_FILLS.has(String(props.fill ?? '').toLowerCase()) ? INK : '#fff'
                       return (
                         <text
                           x={cx + radius * Math.cos(rad)}
@@ -256,11 +255,11 @@ export function MonthlySales({
         ) : (
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={dayRows}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(61,52,44,0.08)" />
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="date" tick={{ fontSize: 11 }} />
               <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} width={48} />
               <Tooltip formatter={(value) => formatMoney(Number(value))} />
-              <Line type="monotone" dataKey="revenue" name="Revenue" stroke="#866C5A" strokeWidth={2.5} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="revenue" name="Revenue" stroke={TAUPE} strokeWidth={2.5} dot={{ r: 3 }} />
             </LineChart>
           </ResponsiveContainer>
         )}
@@ -277,7 +276,7 @@ export function MonthlySales({
         ) : (
           <ResponsiveContainer width="100%" height={360}>
             <BarChart data={topCustomers} layout="vertical" margin={{ left: 8, right: 16 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(61,52,44,0.08)" horizontal={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} horizontal={false} />
               <XAxis type="number" tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} />
               <YAxis type="category" dataKey="name" width={196} tick={CustomerTick} />
               <Tooltip
@@ -304,7 +303,7 @@ export function MonthlySales({
         ) : (
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={topModels}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(61,52,44,0.08)" />
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis
                 dataKey="name"
                 tick={{ fontSize: 11 }}
