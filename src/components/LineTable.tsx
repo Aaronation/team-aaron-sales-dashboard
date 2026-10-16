@@ -96,7 +96,7 @@ export function LineTable({ rows }: Props) {
                   ) : null}
                 </td>
                 <td>{r.quantity}</td>
-                <td>{formatMoney(r.totalAmount)}</td>
+                <td className="mono">{formatMoney(r.totalAmount)}</td>
               </tr>
             ))}
           </tbody>

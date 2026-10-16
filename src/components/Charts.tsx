@@ -52,7 +52,7 @@ export function Charts({ bySalesperson, byCustomer, bySku, daily }: Props) {
         <figcaption>Reps · this week vs same period last month</figcaption>
         <ResponsiveContainer width="100%" height={260}>
           <BarChart data={repData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(26,36,32,0.08)" />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(61,52,44,0.08)" />
             <XAxis dataKey="name" />
             <YAxis tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} width={48} />
             <Tooltip formatter={(v) => formatMoney(Number(v))} />
@@ -60,10 +60,10 @@ export function Charts({ bySalesperson, byCustomer, bySku, daily }: Props) {
             <Bar
               dataKey="priorPeriod"
               name="Same period last month"
-              fill="#8a9a88"
+              fill="#DFCF99"
               radius={[4, 4, 0, 0]}
             />
-            <Bar dataKey="thisPeriod" name="This week" fill="#2f5d4a" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="thisPeriod" name="This week" fill="#70823E" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </figure>
@@ -72,11 +72,11 @@ export function Charts({ bySalesperson, byCustomer, bySku, daily }: Props) {
         <figcaption>Days in review week</figcaption>
         <ResponsiveContainer width="100%" height={260}>
           <LineChart data={trend}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(26,36,32,0.08)" />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(61,52,44,0.08)" />
             <XAxis dataKey="date" tick={{ fontSize: 11 }} />
             <YAxis tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} width={48} />
             <Tooltip formatter={(v) => formatMoney(Number(v))} />
-            <Line type="monotone" dataKey="revenue" stroke="#6b8f71" strokeWidth={2.5} dot={{ r: 3 }} />
+            <Line type="monotone" dataKey="revenue" stroke="#866C5A" strokeWidth={2.5} dot={{ r: 3 }} />
           </LineChart>
         </ResponsiveContainer>
       </figure>
@@ -85,7 +85,7 @@ export function Charts({ bySalesperson, byCustomer, bySku, daily }: Props) {
         <figcaption>Top customers this week</figcaption>
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={topCust} layout="vertical" margin={{ left: 4, right: 12 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(26,36,32,0.08)" horizontal={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(61,52,44,0.08)" horizontal={false} />
             <XAxis type="number" tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
             <YAxis type="category" dataKey="name" width={96} tick={{ fontSize: 11 }} />
             <Tooltip
@@ -100,7 +100,7 @@ export function Charts({ bySalesperson, byCustomer, bySku, daily }: Props) {
                 return `${d.name} · ${delta}`
               }}
             />
-            <Bar dataKey="revenue" fill="#6b8f71" radius={[0, 4, 4, 0]} />
+            <Bar dataKey="revenue" fill="#D8853F" radius={[0, 4, 4, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </figure>
@@ -109,7 +109,7 @@ export function Charts({ bySalesperson, byCustomer, bySku, daily }: Props) {
         <figcaption>Top product models (qty)</figcaption>
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={topSku}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(26,36,32,0.08)" />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(61,52,44,0.08)" />
             <XAxis
               dataKey="name"
               tick={{ fontSize: 10 }}
@@ -124,7 +124,7 @@ export function Charts({ bySalesperson, byCustomer, bySku, daily }: Props) {
                 name === 'qty' ? Number(v).toLocaleString() : formatMoney(Number(v))
               }
             />
-            <Bar dataKey="qty" fill="#d4a017" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="qty" fill="#E0B44A" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </figure>

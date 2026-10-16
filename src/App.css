@@ -314,13 +314,13 @@
 }
 
 .monthly-table tr.is-active td {
-  background: rgba(212, 160, 23, 0.18);
+  background: rgba(224, 180, 74, 0.22);
 }
 
 .monthly-table tfoot th,
 .monthly-table tfoot td {
   font-weight: 600;
-  background: #efe8dc;
+  background: #ebe0c8;
 }
 
 .share-list {
@@ -488,7 +488,7 @@ td {
 th {
   position: sticky;
   top: 0;
-  background: #efe8dc;
+  background: #ebe0c8;
   font-size: 0.72rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;

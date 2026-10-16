@@ -1,25 +1,25 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 :root {
-  --font-display: 'Fraunces', Georgia, serif;
+  --font-display: 'IBM Plex Sans', 'Segoe UI', sans-serif;
   --font-body: 'IBM Plex Sans', 'Segoe UI', sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
-  --ink: #1a2420;
-  --ink-soft: #5c6359;
-  --accent: #2f5d4a;
-  --accent-deep: #244a3b;
-  --up: #3d6b4f;
-  --down: #a34a3a;
-  --line: rgba(26, 36, 32, 0.1);
-  --line-strong: rgba(26, 36, 32, 0.2);
-  --surface: rgba(252, 250, 246, 0.92);
-  --bg0: #f3efe6;
-  --bg1: #ebe4d8;
-  --bg2: #d4c4b0;
-  --clay: #c47a4a;
-  --amber: #d4a017;
-  --sage: #8a9a88;
-  --paper: #fcfaf6;
+  --ink: #3d342c;
+  --ink-soft: #866c5a;
+  --accent: #70823e;
+  --accent-deep: #5a6a32;
+  --up: #70823e;
+  --down: #d8853f;
+  --line: rgba(61, 52, 44, 0.1);
+  --line-strong: rgba(61, 52, 44, 0.2);
+  --surface: rgba(243, 234, 216, 0.92);
+  --bg0: #f3ead8;
+  --bg1: #ebe0c8;
+  --bg2: #dfcf99;
+  --clay: #d8853f;
+  --amber: #e0b44a;
+  --sage: #dfcf99;
+  --paper: #f3ead8;
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -52,8 +52,8 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background:
-    radial-gradient(1200px 520px at 8% -12%, rgba(47, 93, 74, 0.16), transparent 56%),
-    radial-gradient(880px 440px at 100% 0%, rgba(196, 122, 74, 0.2), transparent 52%),
+    radial-gradient(1200px 520px at 8% -12%, rgba(112, 130, 62, 0.18), transparent 56%),
+    radial-gradient(880px 440px at 100% 0%, rgba(216, 133, 63, 0.18), transparent 52%),
     linear-gradient(180deg, var(--bg0), var(--bg1) 42%, var(--bg2));
   background-attachment: fixed;
 }

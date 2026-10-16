@@ -17,7 +17,7 @@ import {
   type SellOutShare,
 } from '../lib/aggregates'
 
-const SLICE_COLORS = ['#2f5d4a', '#6b8f71', '#d4a017', '#c47a4a', '#5c6b5a', '#8a9a88', '#a67c52', '#3d5a4a']
+const SLICE_COLORS = ['#70823E', '#866C5A', '#E0B44A', '#D8853F', '#DFCF99', '#5a6a32', '#c4a36a', '#F3EAD8']
 
 type Props = {
   months: MonthTotal[]
@@ -64,7 +64,7 @@ export function MonthlySales({
           ) : (
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={chartRows}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(26,36,32,0.08)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(61,52,44,0.08)" />
                 <XAxis dataKey="label" tick={{ fontSize: 12 }} />
                 <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} width={48} />
                 <Tooltip formatter={(value) => formatMoney(Number(value))} />
@@ -72,7 +72,7 @@ export function MonthlySales({
                   {chartRows.map((month) => (
                     <Cell
                       key={month.monthKey}
-                      fill={month.monthKey === activeMonthKey ? '#d4a017' : '#2f5d4a'}
+                      fill={month.monthKey === activeMonthKey ? '#E0B44A' : '#70823E'}
                     />
                   ))}
                 </Bar>
@@ -101,7 +101,7 @@ export function MonthlySales({
                     cy="50%"
                     outerRadius={92}
                     paddingAngle={1}
-                    stroke="#fcfaf6"
+                    stroke="#866C5A"
                     isAnimationActive={false}
                     labelLine={false}
                     label={(raw) => {
@@ -125,8 +125,8 @@ export function MonthlySales({
                       if (![cx, cy, midAngle, outer].every((n) => Number.isFinite(n))) return null
                       const radius = inner + (outer - inner) * 0.62
                       const rad = (-midAngle * Math.PI) / 180
-                      const light = new Set(['#d4a017', '#8a9a88', '#c47a4a'])
-                      const fill = light.has(String(props.fill ?? '').toLowerCase()) ? '#1a2420' : '#fff'
+                      const light = new Set(['#dfcf99', '#e0b44a', '#f3ead8', '#d8853f'])
+                      const fill = light.has(String(props.fill ?? '').toLowerCase()) ? '#3d342c' : '#fff'
                       return (
                         <text
                           x={cx + radius * Math.cos(rad)}
