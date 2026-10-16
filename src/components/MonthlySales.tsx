@@ -19,8 +19,7 @@ import {
   type RepAchievement,
   type SellOutShare,
 } from '../lib/aggregates'
-
-const SLICE_COLORS = ['#9AAB78', '#866C5A', '#E0B44A', '#D8853F', '#DFCF99', '#b7c49a', '#c4a36a', '#F3EAD8']
+import { sliceColorAt } from '../lib/palette'
 
 function CustomerTick({
   x = 0,
@@ -47,6 +46,8 @@ type Props = {
   showTarget: boolean
   repRows: RepAchievement[]
   monthCustomers: NamedTotal[]
+  salesperson: string
+  customerBarColor: string
 }
 
 function formatAchieve(achieve: number | null): string {
@@ -63,6 +64,8 @@ export function MonthlySales({
   showTarget,
   repRows,
   monthCustomers,
+  salesperson,
+  customerBarColor,
 }: Props) {
   const chartRows = months.map((month) => ({
     ...month,
@@ -77,6 +80,10 @@ export function MonthlySales({
     { revenue: 0, quantity: 0, lines: 0 },
   )
   const pieRows = shares.filter((share) => share.revenue > 0)
+  const customerTitle =
+    salesperson === 'all'
+      ? `Top customers · ${shareLabel}`
+      : `${salesperson} top customers · ${shareLabel}`
   const topCustomers = monthCustomers.slice(0, 10).map((customer) => ({
     name: customer.name.length > 22 ? customer.name.slice(0, 21) + '…' : customer.name,
     fullName: customer.name,
@@ -176,7 +183,7 @@ export function MonthlySales({
                     }}
                   >
                     {pieRows.map((share, index) => (
-                      <Cell key={share.name} fill={SLICE_COLORS[index % SLICE_COLORS.length]} />
+                      <Cell key={share.name} fill={sliceColorAt(index)} />
                     ))}
                   </Pie>
                   <Tooltip
@@ -197,7 +204,7 @@ export function MonthlySales({
                   <li key={share.name}>
                     <span
                       className="share-list__swatch"
-                      style={{ background: SLICE_COLORS[index % SLICE_COLORS.length] }}
+                      style={{ background: sliceColorAt(index) }}
                     />
                     <span>{share.name}</span>
                     <span className="share-list__pct">{(share.share * 100).toFixed(1)}%</span>
@@ -211,7 +218,7 @@ export function MonthlySales({
       </div>
 
       <figure className="chart-panel monthly-customers">
-        <figcaption>Top customers · {shareLabel}</figcaption>
+        <figcaption>{customerTitle}</figcaption>
         <p className="monthly__caption">
           Top 10 by sell-out (HKD) for the review month. Follows the salesperson, department, and
           search filters.
@@ -231,7 +238,7 @@ export function MonthlySales({
                   return row?.fullName ?? ''
                 }}
               />
-              <Bar dataKey="revenue" name="Sell-out" fill="#D8853F" radius={[0, 4, 4, 0]} />
+              <Bar dataKey="revenue" name="Sell-out" fill={customerBarColor} radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
         )}

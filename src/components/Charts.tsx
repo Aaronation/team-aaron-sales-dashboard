@@ -36,9 +36,18 @@ type Props = {
   byCustomer: NamedDelta[]
   bySku: NamedDelta[]
   daily: Daily[]
+  customerTitle: string
+  customerBarColor: string
 }
 
-export function Charts({ bySalesperson, byCustomer, bySku, daily }: Props) {
+export function Charts({
+  bySalesperson,
+  byCustomer,
+  bySku,
+  daily,
+  customerTitle,
+  customerBarColor,
+}: Props) {
   const repData = bySalesperson.map((s) => ({
     name: shortName(s.name),
     thisPeriod: Math.round(s.revenue),
@@ -98,7 +107,7 @@ export function Charts({ bySalesperson, byCustomer, bySku, daily }: Props) {
       </figure>
 
       <figure className="chart-panel">
-        <figcaption>Top customers this week</figcaption>
+        <figcaption>{customerTitle}</figcaption>
         <ResponsiveContainer width="100%" height={360}>
           <BarChart data={topCust} layout="vertical" margin={{ left: 4, right: 12 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(61,52,44,0.08)" horizontal={false} />
@@ -116,7 +125,7 @@ export function Charts({ bySalesperson, byCustomer, bySku, daily }: Props) {
                 return `${d.name} · ${delta}`
               }}
             />
-            <Bar dataKey="revenue" fill="#D8853F" radius={[0, 4, 4, 0]} />
+            <Bar dataKey="revenue" fill={customerBarColor} radius={[0, 4, 4, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </figure>

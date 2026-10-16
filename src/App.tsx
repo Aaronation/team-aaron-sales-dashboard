@@ -32,6 +32,7 @@ import {
   weekDateRange,
   weekLabel,
 } from './lib/aggregates'
+import { customerBarColor } from './lib/palette'
 import { mergeImportedItems, type ImportMode } from './lib/ingest'
 import { readImportFile, type LoadedImport } from './lib/readImportFile'
 import type { Filters, LineItem, SalesPayload } from './lib/types'
@@ -391,11 +392,24 @@ export default function App() {
         showTarget={filters.salesperson === 'all'}
         repRows={repRows}
         monthCustomers={monthCustomers}
+        salesperson={filters.salesperson}
+        customerBarColor={customerBarColor(shares, filters.salesperson)}
       />
 
       <RepBoard rows={bySp} />
 
-      <Charts bySalesperson={bySp} byCustomer={byCust} bySku={bySku} daily={daily} />
+      <Charts
+        bySalesperson={bySp}
+        byCustomer={byCust}
+        bySku={bySku}
+        daily={daily}
+        customerTitle={
+          filters.salesperson === 'all'
+            ? 'Top customers this week'
+            : `${filters.salesperson} top customers`
+        }
+        customerBarColor={customerBarColor(shares, filters.salesperson)}
+      />
 
       <LineTable rows={thisWeek} />
 
