@@ -1,5 +1,5 @@
 import type { Filters } from '../lib/types'
-import { weekLabel } from '../lib/aggregates'
+import { shortName, weekLabel } from '../lib/aggregates'
 
 type Props = {
   filters: Filters
@@ -42,7 +42,7 @@ export function FilterBar({
           <option value="all">All reps</option>
           {salespeople.map((s) => (
             <option key={s} value={s}>
-              {s}
+              {shortName(s)}
             </option>
           ))}
         </select>
@@ -70,7 +70,7 @@ export function FilterBar({
           onChange={(e) => onChange({ ...filters, query: e.target.value })}
         />
       </label>
-      <p className="filters__meta">{rowCount.toLocaleString()} lines this week</p>
+      <p className="filters__meta">{rowCount.toLocaleString()} invoices this week</p>
     </div>
   )
 }

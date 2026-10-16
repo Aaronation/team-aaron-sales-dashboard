@@ -16,18 +16,22 @@ import {
   formatRangeLabel,
   groupBy,
   groupByWithPrior,
+  invoiceCountsBy,
   isoWeekKey,
   listWeekKeys,
+  monthDaily,
   monthKeyFromDate,
   monthlyTotals,
   pctDelta,
   repMonthAchievements,
   samePeriodLastMonth,
   sellOutShares,
+  shortName,
   sumQty,
   sumRevenue,
   teamTargetForMonth,
   uniqueCustomers,
+  uniqueInvoices,
   uniqueSorted,
   weekDateRange,
   weekLabel,
@@ -72,7 +76,7 @@ function reconcileFilters(filters: Filters, items: LineItem[]): Filters {
 
 function monthlyScopeNote(filters: Filters): string {
   const parts: string[] = []
-  if (filters.salesperson !== 'all') parts.push(filters.salesperson)
+  if (filters.salesperson !== 'all') parts.push(shortName(filters.salesperson))
   if (filters.department !== 'all') parts.push(filters.department)
   const query = filters.query.trim()
   if (query) parts.push(`search “${query}”`)
@@ -204,6 +208,28 @@ export default function App() {
       (row) => row.customer,
     )
   }, [payload, filters])
+  const monthModels = useMemo(() => {
+    if (!payload || !filters || filters.weekKey === 'all') return []
+    const range = weekDateRange(filters.weekKey)
+    if (!range) return []
+    const monthKey = monthKeyFromDate(range.end)
+    return groupBy(
+      filterIgnoringWeek(payload.lineItems, filters).filter(
+        (row) => row.date != null && monthKeyFromDate(row.date) === monthKey,
+      ),
+      (row) => row.productModel || row.sku,
+    )
+  }, [payload, filters])
+  const monthDays = useMemo(() => {
+    if (!payload || !filters || filters.weekKey === 'all') return []
+    const range = weekDateRange(filters.weekKey)
+    if (!range) return []
+    return monthDaily(filterIgnoringWeek(payload.lineItems, filters), monthKeyFromDate(range.end))
+  }, [payload, filters])
+  const weekInvoices = useMemo(
+    () => invoiceCountsBy(thisWeek, (row) => row.salesperson),
+    [thisWeek],
+  )
   const shareRows = useMemo(() => {
     if (!payload || !filters) return []
     const range = filters.weekKey === 'all' ? null : weekDateRange(filters.weekKey)
@@ -365,7 +391,7 @@ export default function App() {
         salespeople={salespeople}
         departments={departments}
         onChange={setFilters}
-        rowCount={thisWeek.length}
+        rowCount={uniqueInvoices(thisWeek)}
       />
 
       <KpiRow
@@ -377,10 +403,12 @@ export default function App() {
         customers={uniqueCustomers(thisWeek)}
         prevCustomers={uniqueCustomers(priorPeriod)}
         quantity={sumQty(thisWeek)}
-        lines={thisWeek.length}
+        invoices={uniqueInvoices(thisWeek)}
         mtdRevenue={mtdRevenue}
         monthTarget={monthTarget}
         monthLabel={monthKey}
+        monthRevenue={months.find((month) => month.monthKey === monthKey)?.revenue ?? 0}
+        reviewMonthLabel={formatMonthLabel(monthKey)}
       />
 
       <MonthlySales
@@ -392,11 +420,14 @@ export default function App() {
         showTarget={filters.salesperson === 'all'}
         repRows={repRows}
         monthCustomers={monthCustomers}
+        monthDays={monthDays}
+        monthModels={monthModels}
         salesperson={filters.salesperson}
         customerBarColor={customerBarColor(shares, filters.salesperson)}
+        modelBarColor={customerBarColor(shares, filters.salesperson, ALL_REPS_SKU_BAR)}
       />
 
-      <RepBoard rows={bySp} />
+      <RepBoard rows={bySp} invoiceCounts={weekInvoices} />
 
       <Charts
         bySalesperson={bySp}
@@ -406,13 +437,13 @@ export default function App() {
         customerTitle={
           filters.salesperson === 'all'
             ? 'Top customers this week'
-            : `${filters.salesperson} top customers`
+            : `${shortName(filters.salesperson)} top customers`
         }
         customerBarColor={customerBarColor(shares, filters.salesperson)}
         skuTitle={
           filters.salesperson === 'all'
             ? 'Top product models (qty)'
-            : `${filters.salesperson} top product models`
+            : `${shortName(filters.salesperson)} top product models`
         }
         skuBarColor={customerBarColor(shares, filters.salesperson, ALL_REPS_SKU_BAR)}
       />
@@ -421,7 +452,7 @@ export default function App() {
 
       <footer className="footer">
         <p>
-          Phase 2 · {payload.meta.mergedRows.toLocaleString()} line items · ISO week{' '}
+          Phase 2 · {uniqueInvoices(payload.lineItems).toLocaleString()} invoices · ISO week{' '}
           {filters.weekKey}
           {payload.meta.generatedFrom.some((name) => name.startsWith('import:'))
             ? ` · ${payload.meta.generatedFrom

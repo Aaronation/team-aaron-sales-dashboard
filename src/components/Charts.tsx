@@ -11,7 +11,7 @@ import {
   YAxis,
 } from 'recharts'
 import type { NamedDelta } from '../lib/aggregates'
-import { formatMoney, formatPct, shortName } from '../lib/aggregates'
+import { formatMoney, formatPct, shortName, tickLabel } from '../lib/aggregates'
 
 type Daily = { date: string; revenue: number; quantity: number }
 
@@ -59,7 +59,8 @@ export function Charts({
   }))
 
   const topCust = byCustomer.slice(0, 10).map((c) => ({
-    name: c.name.length > 14 ? c.name.slice(0, 13) + '…' : c.name,
+    name: tickLabel(c.name, 16),
+    fullName: c.name,
     revenue: Math.round(c.revenue),
     delta: c.deltaPct,
   }))
@@ -125,11 +126,11 @@ export function Charts({
                 name === 'revenue' ? formatMoney(Number(v)) : String(v)
               }
               labelFormatter={(_, payload) => {
-                const d = payload?.[0]?.payload
+                const d = payload?.[0]?.payload as { fullName?: string; delta?: number | null } | undefined
                 if (!d) return ''
                 const delta =
                   d.delta == null ? 'new vs prior month' : `MoM ${formatPct(d.delta as number)}`
-                return `${d.name} · ${delta}`
+                return `${d.fullName ?? ''} · ${delta}`
               }}
             />
             <Bar dataKey="revenue" fill={customerBarColor} radius={[0, 4, 4, 0]} />

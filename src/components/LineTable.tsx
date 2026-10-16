@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { LineItem } from '../lib/types'
-import { formatMoney } from '../lib/aggregates'
+import { displayCustomer, formatMoney, shortName } from '../lib/aggregates'
 
 type Props = { rows: LineItem[] }
 
@@ -141,8 +141,8 @@ export function LineTable({ rows }: Props) {
               <tr key={r.invoice}>
                 <td>{r.date}</td>
                 <td className="mono">{r.invoice}</td>
-                <td>{r.customer}</td>
-                <td>{r.salesperson}</td>
+                <td title={r.customer ?? undefined}>{r.customer ? displayCustomer(r.customer) : ''}</td>
+                <td>{r.salesperson ? shortName(r.salesperson) : ''}</td>
                 <td>{Math.round(r.quantity).toLocaleString()}</td>
                 <td className="mono">{formatMoney(r.totalAmount)}</td>
               </tr>

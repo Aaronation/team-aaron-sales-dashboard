@@ -137,6 +137,18 @@
   color: var(--ink-soft);
 }
 
+.kpis__label--sub {
+  margin-top: 0.85rem;
+}
+
+.kpis__month {
+  margin: 0.15rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 .kpis__value {
   margin: 0.35rem 0 0;
   font-family: var(--font-display);

@@ -9,10 +9,12 @@ type Props = {
   customers: number
   prevCustomers: number
   quantity: number
-  lines: number
+  invoices: number
   mtdRevenue: number
   monthTarget: number
   monthLabel: string
+  monthRevenue: number
+  reviewMonthLabel: string
 }
 
 function Delta({ value }: { value: number | null }) {
@@ -30,10 +32,12 @@ export function KpiRow({
   customers,
   prevCustomers,
   quantity,
-  lines,
+  invoices,
   mtdRevenue,
   monthTarget,
   monthLabel,
+  monthRevenue,
+  reviewMonthLabel,
 }: Props) {
   const mtdPct = monthTarget > 0 ? mtdRevenue / monthTarget : 0
   const custDelta =
@@ -55,8 +59,10 @@ export function KpiRow({
           <Delta value={delta} />
         </p>
         <p className="kpis__hint">
-          {lines.toLocaleString()} lines · {quantity.toLocaleString()} units
+          {invoices.toLocaleString()} invoices · {quantity.toLocaleString()} units
         </p>
+        <p className="kpis__label kpis__label--sub">Monthly revenue · {reviewMonthLabel}</p>
+        <p className="kpis__month">{formatMoney(monthRevenue)}</p>
       </div>
       <div>
         <p className="kpis__label">Unique customers</p>

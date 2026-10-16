@@ -135,12 +135,18 @@ export type MonthTotal = {
   label: string
   revenue: number
   quantity: number
-  lines: number
+  invoices: number
   customers: number
 }
 
 export function monthlyTotals(items: LineItem[]): MonthTotal[] {
-  const map = new Map<string, MonthTotal & { customerSet: Set<string> }>()
+  const map = new Map<
+    string,
+    Omit<MonthTotal, 'invoices' | 'customers'> & {
+      customerSet: Set<string>
+      invoiceSet: Set<string>
+    }
+  >()
   for (const row of items) {
     if (!row.date) continue
     const monthKey = monthKeyFromDate(row.date)
@@ -151,19 +157,22 @@ export function monthlyTotals(items: LineItem[]): MonthTotal[] {
         label: formatMonthLabel(monthKey),
         revenue: 0,
         quantity: 0,
-        lines: 0,
-        customers: 0,
         customerSet: new Set(),
+        invoiceSet: new Set(),
       }
       map.set(monthKey, cur)
     }
     cur.revenue += row.totalAmount || 0
     cur.quantity += row.quantity || 0
-    cur.lines += 1
+    if (row.invoice) cur.invoiceSet.add(row.invoice)
     if (row.customer) cur.customerSet.add(row.customer)
   }
   return [...map.values()]
-    .map(({ customerSet, ...rest }) => ({ ...rest, customers: customerSet.size }))
+    .map(({ customerSet, invoiceSet, ...rest }) => ({
+      ...rest,
+      customers: customerSet.size,
+      invoices: invoiceSet.size,
+    }))
     .sort((a, b) => a.monthKey.localeCompare(b.monthKey))
 }
 
@@ -312,6 +321,29 @@ export function uniqueCustomers(items: LineItem[]): number {
   return new Set(items.map((r) => r.customer).filter(Boolean)).size
 }
 
+export function uniqueInvoices(items: LineItem[]): number {
+  return new Set(items.map((row) => row.invoice).filter(Boolean)).size
+}
+
+/** Unique invoice count per group key (salesperson, and so on). */
+export function invoiceCountsBy(
+  items: LineItem[],
+  keyFn: (row: LineItem) => string | null | undefined,
+): Map<string, number> {
+  const sets = new Map<string, Set<string>>()
+  for (const row of items) {
+    const key = keyFn(row)
+    if (!key || !row.invoice) continue
+    let invoices = sets.get(key)
+    if (!invoices) {
+      invoices = new Set()
+      sets.set(key, invoices)
+    }
+    invoices.add(row.invoice)
+  }
+  return new Map([...sets].map(([key, invoices]) => [key, invoices.size]))
+}
+
 export type NamedTotal = { name: string; revenue: number; quantity: number; lines: number }
 
 export function groupBy(
@@ -364,6 +396,32 @@ export function dailyTrend(items: LineItem[]): { date: string; revenue: number; 
   return [...map.values()].sort((a, b) => a.date.localeCompare(b.date))
 }
 
+/**
+ * Every calendar day from the 1st of `monthKey` through the last day that has
+ * sales in that month. Days with no invoices are zero. Days after the data ends
+ * are omitted.
+ */
+export function monthDaily(
+  items: LineItem[],
+  monthKey: string,
+): { date: string; revenue: number; quantity: number }[] {
+  const present = dailyTrend(
+    items.filter((row) => row.date != null && monthKeyFromDate(row.date) === monthKey),
+  )
+  if (present.length === 0) return []
+  const byDay = new Map(present.map((day) => [day.date, day]))
+  const last = present[present.length - 1].date
+  const out: { date: string; revenue: number; quantity: number }[] = []
+  const cursor = new Date(`${monthKey}-01T12:00:00Z`)
+  const end = new Date(`${last}T12:00:00Z`)
+  while (cursor.getTime() <= end.getTime()) {
+    const date = cursor.toISOString().slice(0, 10)
+    out.push(byDay.get(date) ?? { date, revenue: 0, quantity: 0 })
+    cursor.setUTCDate(cursor.getUTCDate() + 1)
+  }
+  return out
+}
+
 export function pctDelta(current: number, previous: number): number | null {
   if (previous === 0) return current > 0 ? null : 0
   return (current - previous) / previous
@@ -390,8 +448,32 @@ export function formatPct(n: number): string {
   return `${sign}${(n * 100).toFixed(1)}%`
 }
 
+/** Display name for a salesperson. Filter values stay the full raw name. */
 export function shortName(full: string): string {
-  return full.split(' ')[0] ?? full
+  const trimmed = full.trim()
+  if (!trimmed) return full
+  return trimmed.split(/\s+/)[0] ?? trimmed
+}
+
+const CUSTOMER_SUFFIX =
+  /(?:\s+(?:company\s+limited|co\.?,?\s*ltd\.?|limited|ltd\.?|company)|股份有限公司|有限公司)\s*$/i
+
+/** Shorter customer label: trimmed, collapsed spaces, legal suffixes removed. */
+export function displayCustomer(name: string): string {
+  let text = name.trim().replace(/\s+/g, ' ')
+  let previous = ''
+  while (text && text !== previous) {
+    previous = text
+    text = text.replace(CUSTOMER_SUFFIX, '').trim()
+  }
+  text = text.replace(/股份有限公司|有限公司/g, ' ').replace(/\s+/g, ' ').trim()
+  return text || name.trim()
+}
+
+export function tickLabel(name: string, max: number): string {
+  const shown = displayCustomer(name)
+  if (shown.length <= max) return shown
+  return `${shown.slice(0, Math.max(1, max - 1))}…`
 }
 
 export function weekLabel(weekKey: string): string {

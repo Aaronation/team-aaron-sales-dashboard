@@ -3,6 +3,8 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  Line,
+  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -14,6 +16,8 @@ import {
   formatMoney,
   formatMonthLabel,
   MONTHLY_TEAM_TARGETS,
+  shortName,
+  tickLabel,
   type MonthTotal,
   type NamedTotal,
   type RepAchievement,
@@ -46,8 +50,11 @@ type Props = {
   showTarget: boolean
   repRows: RepAchievement[]
   monthCustomers: NamedTotal[]
+  monthDays: { date: string; revenue: number }[]
+  monthModels: NamedTotal[]
   salesperson: string
   customerBarColor: string
+  modelBarColor: string
 }
 
 function formatAchieve(achieve: number | null): string {
@@ -64,8 +71,11 @@ export function MonthlySales({
   showTarget,
   repRows,
   monthCustomers,
+  monthDays,
+  monthModels,
   salesperson,
   customerBarColor,
+  modelBarColor,
 }: Props) {
   const chartRows = months.map((month) => ({
     ...month,
@@ -75,19 +85,36 @@ export function MonthlySales({
     (sum, month) => ({
       revenue: sum.revenue + month.revenue,
       quantity: sum.quantity + month.quantity,
-      lines: sum.lines + month.lines,
+      invoices: sum.invoices + month.invoices,
     }),
-    { revenue: 0, quantity: 0, lines: 0 },
+    { revenue: 0, quantity: 0, invoices: 0 },
   )
-  const pieRows = shares.filter((share) => share.revenue > 0)
-  const customerTitle =
-    salesperson === 'all'
-      ? `Top customers · ${shareLabel}`
-      : `${salesperson} top customers · ${shareLabel}`
+  const repLabel = salesperson === 'all' ? null : shortName(salesperson)
+  const pieRows = shares
+    .filter((share) => share.revenue > 0)
+    .map((share) => ({ ...share, name: shortName(share.name) }))
+  const customerTitle = repLabel
+    ? `${repLabel} top customers · ${shareLabel}`
+    : `Top customers · ${shareLabel}`
+  const modelTitle = repLabel
+    ? `${repLabel} top product models · ${shareLabel}`
+    : `Top product models · ${shareLabel}`
   const topCustomers = monthCustomers.slice(0, 10).map((customer) => ({
-    name: customer.name.length > 22 ? customer.name.slice(0, 21) + '…' : customer.name,
+    name: tickLabel(customer.name, 24),
     fullName: customer.name,
     revenue: Math.round(customer.revenue),
+  }))
+  const topModels = [...monthModels]
+    .sort((a, b) => b.quantity - a.quantity || b.revenue - a.revenue)
+    .slice(0, 8)
+    .map((model) => ({
+      name: model.name,
+      qty: Math.round(model.quantity),
+      revenue: Math.round(model.revenue),
+    }))
+  const dayRows = monthDays.map((day) => ({
+    date: day.date.slice(5),
+    revenue: Math.round(day.revenue),
   }))
 
   return (
@@ -206,7 +233,7 @@ export function MonthlySales({
                       className="share-list__swatch"
                       style={{ background: sliceColorAt(index) }}
                     />
-                    <span>{share.name}</span>
+                    <span>{shortName(share.name)}</span>
                     <span className="share-list__pct">{(share.share * 100).toFixed(1)}%</span>
                     <span className="muted">{formatMoney(share.revenue)}</span>
                   </li>
@@ -216,6 +243,27 @@ export function MonthlySales({
           )}
         </figure>
       </div>
+
+      <figure className="chart-panel monthly-customers">
+        <figcaption>Days in review month · {shareLabel}</figcaption>
+        <p className="monthly__caption">
+          Daily sell-out for the full calendar month of the review week. Days with no sales are
+          zero. The axis stops on the last day that has sales.
+        </p>
+        {dayRows.length === 0 ? (
+          <p className="monthly__empty">No daily sales in {shareLabel}.</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={dayRows}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(61,52,44,0.08)" />
+              <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+              <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} width={48} />
+              <Tooltip formatter={(value) => formatMoney(Number(value))} />
+              <Line type="monotone" dataKey="revenue" name="Revenue" stroke="#866C5A" strokeWidth={2.5} dot={{ r: 3 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </figure>
 
       <figure className="chart-panel monthly-customers">
         <figcaption>{customerTitle}</figcaption>
@@ -244,6 +292,38 @@ export function MonthlySales({
         )}
       </figure>
 
+      <figure className="chart-panel monthly-customers">
+        <figcaption>{modelTitle}</figcaption>
+        <p className="monthly__caption">
+          Top 8 product models by quantity for the review month. Follows the salesperson,
+          department, and search filters.
+        </p>
+        {topModels.length === 0 ? (
+          <p className="monthly__empty">No product models in {shareLabel}.</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={topModels}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(61,52,44,0.08)" />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 11 }}
+                interval={0}
+                angle={-30}
+                textAnchor="end"
+                height={64}
+              />
+              <YAxis />
+              <Tooltip
+                formatter={(value, name) =>
+                  name === 'qty' ? Number(value).toLocaleString() : formatMoney(Number(value))
+                }
+              />
+              <Bar dataKey="qty" name="Qty" fill={modelBarColor} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </figure>
+
       <div className="table-scroll">
         <table className="monthly-table">
           <thead>
@@ -251,7 +331,7 @@ export function MonthlySales({
               <th>Month</th>
               <th>Sales (HKD)</th>
               <th>Qty</th>
-              <th>Lines</th>
+              <th>Invoices</th>
               <th>Customers</th>
               {showTarget ? <th>Team target</th> : null}
             </tr>
@@ -268,7 +348,7 @@ export function MonthlySales({
                   </td>
                   <td>{formatMoney(month.revenue)}</td>
                   <td>{Math.round(month.quantity).toLocaleString()}</td>
-                  <td>{month.lines.toLocaleString()}</td>
+                  <td>{month.invoices.toLocaleString()}</td>
                   <td>{month.customers.toLocaleString()}</td>
                   {showTarget ? (
                     <td>
@@ -287,7 +367,7 @@ export function MonthlySales({
                 <th>All months</th>
                 <td>{formatMoney(grand.revenue)}</td>
                 <td>{Math.round(grand.quantity).toLocaleString()}</td>
-                <td>{grand.lines.toLocaleString()}</td>
+                <td>{grand.invoices.toLocaleString()}</td>
                 <td />
                 {showTarget ? <td /> : null}
               </tr>
@@ -322,7 +402,7 @@ function RepTargets({
     <div className="rep-targets">
       <h3>Monthly target by salesperson</h3>
       <p className="monthly__caption">
-        Targets are the team month target × split: Aaron Chang 49%, Kelvin Lai 31%, Kenny Ma 20%.
+        Targets are the team month target × split: Aaron 49%, Kelvin 31%, Kenny 20%.
         Achieve rate is that rep’s month sell-out divided by their target. Reps without a split,
         including Unassigned, show sell-out against —. The salesperson filter does not hide other
         reps. Targets are team-level and are not resized by the department filter.
@@ -344,7 +424,7 @@ function RepTargets({
               <tbody>
                 {reviewRows.map(({ row, figure }) => (
                   <tr key={row.name}>
-                    <td>{row.name}</td>
+                    <td>{shortName(row.name)}</td>
                     <td className="mono">{formatMoney(figure.revenue)}</td>
                     <td className="mono">{figure.target == null ? '—' : formatMoney(figure.target)}</td>
                     <td className="rep-targets__achieve">
@@ -384,7 +464,7 @@ function RepTargets({
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.name}>
-                    <td>{row.name}</td>
+                    <td>{shortName(row.name)}</td>
                     {row.months.map((month) => (
                       <td
                         key={month.monthKey}
