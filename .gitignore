@@ -9,6 +9,9 @@ lerna-debug.log*
 
 node_modules
 dist
+
+# Verification runs. Cleanup must leave these in place; do not commit them.
+artifacts/verify-sales-dashboard/
 dist-ssr
 *.local
 
