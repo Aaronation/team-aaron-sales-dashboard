@@ -8,6 +8,7 @@ type Props = {
   departments: string[]
   onChange: (next: Filters) => void
   rowCount: number
+  disabled?: boolean
 }
 
 export function FilterBar({
@@ -17,6 +18,7 @@ export function FilterBar({
   departments,
   onChange,
   rowCount,
+  disabled = false,
 }: Props) {
   return (
     <div className="filters">
@@ -24,6 +26,7 @@ export function FilterBar({
         <span>Review week</span>
         <select
           value={filters.weekKey}
+          disabled={disabled}
           onChange={(e) => onChange({ ...filters, weekKey: e.target.value })}
         >
           {weeks.map((w) => (
@@ -37,6 +40,7 @@ export function FilterBar({
         <span>Salesperson</span>
         <select
           value={filters.salesperson}
+          disabled={disabled}
           onChange={(e) => onChange({ ...filters, salesperson: e.target.value })}
         >
           <option value="all">All reps</option>
@@ -51,6 +55,7 @@ export function FilterBar({
         <span>Department</span>
         <select
           value={filters.department}
+          disabled={disabled}
           onChange={(e) => onChange({ ...filters, department: e.target.value })}
         >
           <option value="all">All</option>
@@ -67,6 +72,7 @@ export function FilterBar({
           type="search"
           placeholder="Invoice, customer, SKU…"
           value={filters.query}
+          disabled={disabled}
           onChange={(e) => onChange({ ...filters, query: e.target.value })}
         />
       </label>

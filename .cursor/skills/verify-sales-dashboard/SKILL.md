@@ -34,11 +34,11 @@ Start the app for verification (not `npm run dev`, which takes port 5173, and no
 node .cursor/skills/verify-sales-dashboard/helpers/verify.mjs launch
 ```
 
-That runs `node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 4174 --strictPort` in the repo root, then runs doctor. Ready means the process is alive, `GET /` contains `<title>Team Aaron · Weekly manager review</title>`, the served seed bytes match `public/data/sales-line-items.json`, and a throwaway browser shows the heading `Weekly manager review` plus the regions `Import raw data`, `Weekly scorecard`, and `Monthly sales`. `Loading weekly review…` is not ready. Launch exits non-zero and stops its own pid if that bar is not met.
+That runs `node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 4174 --strictPort` in the repo root, then runs doctor. Ready means the process is alive, `GET /` contains `<title>Team Aaron · Weekly manager review</title>`, the served seed bytes match `public/data/sales-line-items.json`, and a throwaway browser shows the heading `Weekly manager review` plus the regions `Import raw data`, `Weekly scorecard`, `Targets and forecast`, and `Monthly sales`. `Loading weekly review…` is not ready. Launch exits non-zero and stops its own pid if that bar is not met.
 
 Stdout includes `ready=yes`, `run_id=`, `base_url=` (`http://127.0.0.1:4174` unless `VERIFY_PORT` is set), and `evidence_dir=`.
 
-The page reaches that state from the bundled seed. No migration and no login. Imports stay in the browser tab's memory. Refresh, or `open`, loads the seed again.
+The page reaches that state from the bundled seed when this browser has no saved working set. No migration and no login. Merge and Replace are stored in IndexedDB (review filters in localStorage). Refresh, or `open`, restores that save. **Reset to seed** clears it and loads the bundled file again. A new drive daemon uses an empty profile, so the first `open` is the seed.
 
 Override port and id together when 4174 is taken. Launch refuses to kill a listener it did not start.
 
@@ -64,7 +64,7 @@ Do not drive a base URL that doctor did not just accept. A `VERIFY_BASE_URL` tha
 
 ## Drive
 
-The harness is `verify.mjs`. One drive daemon holds one Chromium context (locale `en-HK`, viewport 1440×900, light color scheme, temporary profile — not the user's Chrome profile). Commands after `open` share that page. A second `open` navigates to `/` again and drops in-memory filters and imports.
+The harness is `verify.mjs`. One drive daemon holds one Chromium context (locale `en-HK`, viewport 1440×900, light color scheme, temporary profile — not the user's Chrome profile). Commands after `open` share that browser profile, including its IndexedDB and localStorage. A second `open` navigates to `/` again and restores a saved working set. It does not drop an import. **Reset to seed** does.
 
 ```bash
 node .cursor/skills/verify-sales-dashboard/helpers/verify.mjs open
@@ -92,6 +92,7 @@ Stable handles:
 | Department | label `Department`. Values `all` (visible `All`), `Galaxy`, `Galaxy - KA`, `KA` |
 | Search | label `Search`, placeholder `Invoice, customer, SKU…` |
 | Scorecard | region `Weekly scorecard` |
+| Targets and forecast | region `Targets and forecast` |
 | Monthly block | region `Monthly sales` |
 | Month table | the table in that region whose columnheader is `Month` |
 | Sell-out list | `css:.share-list` |
@@ -103,7 +104,7 @@ Stable handles:
 
 Scope strings for `--scope`:
 
-- `Monthly sales` — region accessible name (also `Import raw data`, `Weekly scorecard`, `Rep month-over-month`)
+- `Monthly sales` — region accessible name (also `Import raw data`, `Weekly scorecard`, `Targets and forecast`, `Rep month-over-month`)
 - `css:.hero__week` — CSS selector, prefix `css:`
 - `figure:Sell-out share · Nov 2026` — figure accessible name from its figcaption
 - `role:contentinfo` — role, or `role:button|Next` when a name is required
@@ -147,7 +148,7 @@ Proof standard:
 - Record the action and the resulting state. For hand import that is the before screenshot, the import note, the November row, and the sell-out list after the week change.
 - Check side effects. A merge must leave `public/data/sales-line-items.json` byte-for-byte unchanged (`expect-sha256`). The footer text changes from `bundled seed` to `sample-kingdee-import.csv`. Nothing is posted to a network API.
 - The sample CSV and the seed JSON are the app's real static files, fetched by the page. Do not stub them.
-- There is no dry-run switch. `Load sample export` mutates the open tab. It does not write the repo.
+- There is no dry-run switch. `Load sample export` updates the open browser and saves that working set locally. It does not write the repo.
 - Do not invent a Kingdee sync client. There is no sync control to drive.
 
 Capture UI proof as an ARIA snapshot plus a screenshot that shows `Weekly manager review` or the region just changed. Assert HKD text (`HK$30,000`), not chart pixel colors.
@@ -168,13 +169,15 @@ After a failed drive, run cleanup before starting another launch on the same por
 
 ## Helpers
 
-Both scripts are executable. Invoke them from the repo root.
+These scripts are executable. Invoke them from the repo root.
 
 | Script | Role |
 | --- | --- |
 | `node .cursor/skills/verify-sales-dashboard/helpers/verify.mjs <command>` | Launch, doctor, drive, evidence, cleanup |
 | `bash .cursor/skills/verify-sales-dashboard/features/hand-import.drive.sh` | The hand-import journey against an already launched server |
-| `bash .cursor/skills/verify-sales-dashboard/helpers/prove-hand-import.sh` | Launch, doctor, that journey, cleanup, then fail if the evidence files are missing or the server pid is still alive |
+| `bash .cursor/skills/verify-sales-dashboard/features/persist-and-forecast.drive.sh` | The persist and forecast journey against an already launched server |
+| `bash .cursor/skills/verify-sales-dashboard/helpers/prove-hand-import.sh` | Launch, doctor, the hand-import journey, cleanup, then fail if the evidence files are missing or the server pid is still alive |
+| `bash .cursor/skills/verify-sales-dashboard/helpers/prove-persist-and-forecast.sh` | Launch, doctor, the persist and forecast journey, cleanup, then the same evidence check |
 
 `verify.mjs` with no args prints the command list. Playwright resolves from `.cursor/skills/verify-sales-dashboard/helpers/node_modules`.
 
@@ -184,4 +187,4 @@ End-to-end proof of this skill:
 bash .cursor/skills/verify-sales-dashboard/helpers/prove-hand-import.sh
 ```
 
-Other journeys are in `features/`. Run `open` at the start of each so a previous import is not still in the page.
+Other journeys are in `features/`. Run `open` at the start of each feature. On a fresh drive that loads the seed. If this browser already saved an import, **Reset to seed** before a feature that expects the bundled file.

@@ -197,6 +197,7 @@
 }
 
 .import-panel header h2,
+.forecast header h2,
 .monthly header h2,
 .rep-board h2,
 .table-wrap__head h2 {
@@ -207,6 +208,7 @@
 }
 
 .import-panel header p,
+.forecast header p,
 .monthly header p,
 .monthly__caption,
 .import-panel__hint {
@@ -292,6 +294,42 @@
   margin: 0.65rem 0 0;
   font-size: 0.9rem;
   color: var(--accent-deep);
+}
+
+.import-panel__saved {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+.forecast {
+  margin-bottom: var(--space-6);
+}
+
+.forecast__note {
+  max-width: 44rem;
+}
+
+.forecast__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.forecast__grid > div {
+  padding: var(--space-4);
+  background: var(--surface);
+  border-top: 3px solid var(--amber);
+  border-radius: var(--radius-md);
+}
+
+.pace--on-track {
+  color: var(--up);
+}
+
+.pace--behind {
+  color: var(--down);
 }
 
 .import-panel button:hover:not(:disabled),
@@ -654,7 +692,8 @@ th button {
     grid-column: 1 / -1;
   }
 
-  .kpis {
+  .kpis,
+  .forecast__grid {
     grid-template-columns: 1fr 1fr;
   }
 
@@ -681,7 +720,8 @@ th button {
     grid-template-columns: 1fr;
   }
 
-  .kpis {
+  .kpis,
+  .forecast__grid {
     grid-template-columns: 1fr;
   }
 }

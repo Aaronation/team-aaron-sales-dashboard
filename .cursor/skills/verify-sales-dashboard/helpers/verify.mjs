@@ -64,7 +64,7 @@ Local:
   expect-sha256 --file <repo-relative> --name <id>
   cleanup
 
-Drive (one shared browser; "open" reloads / and drops in-memory imports):
+Drive (one shared browser; "open" reloads / and restores a saved working set):
   open
   click --role <role> --name <name>
   check --role radio --name <name>
@@ -343,6 +343,7 @@ async function openDashboard(page, baseUrl, timeoutMs) {
     await page.getByRole('region', { name: 'Import raw data', exact: true }).waitFor({ state: 'visible', timeout: timeoutMs })
     await page.getByRole('region', { name: 'Weekly scorecard', exact: true }).waitFor({ state: 'visible', timeout: timeoutMs })
     await page.getByRole('region', { name: 'Monthly sales', exact: true }).waitFor({ state: 'visible', timeout: timeoutMs })
+    await page.getByRole('region', { name: 'Targets and forecast', exact: true }).waitFor({ state: 'visible', timeout: timeoutMs })
   } catch (err) {
     const body = await page.locator('body').innerText().catch(() => '')
     throw new Error(`${err.message}\nbody:\n${body.slice(0, 800)}`)
