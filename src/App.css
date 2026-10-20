@@ -454,6 +454,54 @@
   background: var(--bg1);
 }
 
+.series-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  list-style: none;
+  margin: 0.45rem 0 0.15rem;
+  padding: 0;
+  font-size: 0.82rem;
+  color: var(--ink);
+}
+
+.series-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.series-legend__swatch {
+  width: 1rem;
+  height: 0.28rem;
+  border-radius: 1px;
+}
+
+.series-legend__swatch--dashed {
+  background: repeating-linear-gradient(90deg, var(--accent) 0 5px, transparent 5px 8px);
+}
+
+.chart-tip {
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.55rem;
+  color: var(--ink);
+  font-size: 0.82rem;
+}
+
+.chart-tip p {
+  margin: 0;
+}
+
+.chart-tip p + p {
+  margin-top: 0.15rem;
+}
+
+.chart-tip__title {
+  font-weight: 600;
+}
+
 .share-list {
   list-style: none;
   margin: 0.15rem 0 0.35rem;

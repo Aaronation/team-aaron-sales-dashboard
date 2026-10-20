@@ -15,12 +15,10 @@ import {
   filterMtdThroughWeek,
   formatMonthLabel,
   formatRangeLabel,
-  groupBy,
   groupByWithPrior,
   invoiceCountsBy,
   isoWeekKey,
   listWeekKeys,
-  monthDaily,
   monthKeyFromDate,
   monthlyTotals,
   pctDelta,
@@ -37,6 +35,7 @@ import {
   weekDateRange,
   weekLabel,
 } from './lib/aggregates'
+import { customerWeekStacks, modelRepStacks, monthDailyComparison } from './lib/chartSeries'
 import { forecastForReview, forecastScopeNote, reviewTarget } from './lib/forecast'
 import { mtdWorkingDays } from './lib/hkHolidays'
 import { initialFilters, reconcileFilters } from './lib/filters'
@@ -200,36 +199,18 @@ export default function App() {
     filters && filters.weekKey !== 'all' && selectedRange
       ? monthKeyFromDate(selectedRange.end)
       : null
-  const monthCustomers = useMemo(() => {
-    if (!payload || !filters || filters.weekKey === 'all') return []
-    const range = weekDateRange(filters.weekKey)
-    if (!range) return []
-    const monthKey = monthKeyFromDate(range.end)
-    return groupBy(
-      filterIgnoringWeek(payload.lineItems, filters).filter(
-        (row) => row.date != null && monthKeyFromDate(row.date) === monthKey,
-      ),
-      (row) => row.customer,
-    )
-  }, [payload, filters])
-  const monthModels = useMemo(() => {
-    if (!payload || !filters || filters.weekKey === 'all') return []
-    const range = weekDateRange(filters.weekKey)
-    if (!range) return []
-    const monthKey = monthKeyFromDate(range.end)
-    return groupBy(
-      filterIgnoringWeek(payload.lineItems, filters).filter(
-        (row) => row.date != null && monthKeyFromDate(row.date) === monthKey,
-      ),
-      (row) => row.productModel || row.sku,
-    )
-  }, [payload, filters])
-  const monthDays = useMemo(() => {
-    if (!payload || !filters || filters.weekKey === 'all') return []
-    const range = weekDateRange(filters.weekKey)
-    if (!range) return []
-    return monthDaily(filterIgnoringWeek(payload.lineItems, filters), monthKeyFromDate(range.end))
-  }, [payload, filters])
+  const dayComparison = useMemo(
+    () => (shareMonthKey ? monthDailyComparison(monthScoped, shareMonthKey) : null),
+    [monthScoped, shareMonthKey],
+  )
+  const customerStacks = useMemo(
+    () => (shareMonthKey ? customerWeekStacks(monthScoped, shareMonthKey) : { series: [], bars: [] }),
+    [monthScoped, shareMonthKey],
+  )
+  const modelStacks = useMemo(
+    () => (shareMonthKey ? modelRepStacks(monthScoped, shareMonthKey) : { series: [], bars: [] }),
+    [monthScoped, shareMonthKey],
+  )
   const weekInvoices = useMemo(
     () => invoiceCountsBy(thisWeek, (row) => row.salesperson),
     [thisWeek],
@@ -458,12 +439,10 @@ export default function App() {
         scopeNote={monthlyScopeNote(filters)}
         showTarget={filters.salesperson === 'all'}
         repRows={repRows}
-        monthCustomers={monthCustomers}
-        monthDays={monthDays}
-        monthModels={monthModels}
+        dayComparison={dayComparison}
+        customerStacks={customerStacks}
+        modelStacks={modelStacks}
         salesperson={filters.salesperson}
-        customerBarColor={customerBarColor(shares, filters.salesperson)}
-        modelBarColor={customerBarColor(shares, filters.salesperson, ALL_REPS_SKU_BAR)}
       />
 
       <RepBoard rows={bySp} invoiceCounts={weekInvoices} />
