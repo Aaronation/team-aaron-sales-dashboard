@@ -21,6 +21,7 @@
   --bg2: #dfcf99;
   --clay: #d8853f;
   --amber: #e0b44a;
+  --amber-wash: color-mix(in srgb, var(--amber) 22%, transparent);
   --sage: #dfcf99;
   --paper: #f3ead8;
   --space-1: 0.25rem;

@@ -210,6 +210,11 @@ export function MonthlySales({
       <header>
         <h2>Monthly sales</h2>
         <p>{scopeNote}</p>
+        <p>
+          Days and customer comparisons line up by working-day index (day 1 on day 1), not calendar
+          date. Weekends and Hong Kong public holidays stay off the day axis. Top customers and top
+          models run from the 1st through the end of the selected week.
+        </p>
       </header>
       <div className="monthly__grid">
         <figure className="chart-panel">
@@ -223,7 +228,7 @@ export function MonthlySales({
                 <XAxis dataKey="label" tick={{ fontSize: 12 }} />
                 <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} width={48} />
                 <Tooltip formatter={(value) => formatMoney(Number(value))} />
-                <Bar dataKey="revenue" name="Sales" radius={[4, 4, 0, 0]}>
+                <Bar dataKey="revenue" name="Sales" radius={[6, 6, 0, 0]}>
                   {chartRows.map((month) => (
                     <Cell
                       key={month.monthKey}
@@ -331,14 +336,12 @@ export function MonthlySales({
         </figure>
       </div>
 
-      <figure className="chart-panel monthly-customers">
+      <figure className="chart-panel chart-stack">
         <figcaption>Days in review month · {shareLabel}</figcaption>
         <p className="monthly__caption">
           {dayComparison?.hasPrior
-            ? 'Solid line: this month’s working days. Dashed line: last month, aligned by working-day index (day 1 on day 1), not calendar date.'
-            : `This month’s working days. No ${dayComparison?.priorMonthLabel ?? 'prior month'} lines are loaded, so there is no comparison line.`}{' '}
-          Weekends and Hong Kong public holidays are left off. The axis stops on the last day with
-          sales.
+            ? 'Solid line runs through the last day with sales; the dashed line is the same index last month.'
+            : `No ${dayComparison?.priorMonthLabel ?? 'prior month'} lines are loaded, so only this month’s working days are shown.`}
         </p>
         {dayRows.length === 0 ? (
           <p className="monthly__empty">No daily sales in {shareLabel}.</p>
@@ -388,17 +391,14 @@ export function MonthlySales({
         )}
       </figure>
 
-      <figure className="chart-panel monthly-customers">
+      <figure className="chart-panel chart-stack">
         <figcaption>{customerTitle}</figcaption>
         <p className="monthly__caption">
-          {customerMom
-            ? `Top 10 by sell-out (HKD) from the start of ${shareLabel} through ${mtdThroughLabel}. ${
-                customerMom.hasPrior
-                  ? `Last month is the same working-day count (${customerMom.span.workingDayCount} working days), through ${customerMom.span.priorThroughDate?.slice(5)}, aligned by working-day index.`
-                  : `No ${customerMom.span.priorMonthLabel} lines are loaded, so there is no comparison bar.`
-              }`
-            : 'Choose a review week to see month-to-date customers.'}{' '}
-          Follows the salesperson, department, and search filters.
+          {customerMom?.hasPrior && customerMom.span.priorThroughDate
+            ? `Top 10 by sell-out from the start of ${shareLabel} through ${mtdThroughLabel} (${customerMom.span.workingDayCount} working days), compared with last month through ${customerMom.span.priorThroughDate.slice(5)}.`
+            : customerMom
+              ? `No ${customerMom.span.priorMonthLabel} lines are loaded, so the top 10 run from the start of ${shareLabel} through ${mtdThroughLabel} with no comparison bar.`
+              : 'Choose a review week to see month-to-date customers.'}
         </p>
         {topCustomers.length === 0 ? (
           <p className="monthly__empty">No customers in {shareLabel}.</p>
@@ -438,12 +438,10 @@ export function MonthlySales({
         )}
       </figure>
 
-      <figure className="chart-panel monthly-customers">
+      <figure className="chart-panel chart-stack">
         <figcaption>{modelTitle}</figcaption>
         <p className="monthly__caption">
-          Top 10 product models by quantity from the start of {shareLabel} through{' '}
-          {mtdThroughLabel ?? 'the selected week'}. Each bar stacks quantity by salesperson, using
-          the sell-out pie colors. Follows the salesperson, department, and search filters.
+          Top 10 by quantity from the start of {shareLabel} through {mtdThroughLabel ?? 'the selected week'}, stacked by salesperson.
         </p>
         {topModels.length === 0 ? (
           <p className="monthly__empty">No product models in {shareLabel}.</p>

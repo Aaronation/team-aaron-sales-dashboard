@@ -304,6 +304,11 @@
 
 .forecast {
   margin-bottom: var(--space-6);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--clay);
+  border-radius: var(--radius-md);
 }
 
 .forecast__note {
@@ -319,8 +324,7 @@
 
 .forecast__grid > div {
   padding: var(--space-4);
-  background: var(--surface);
-  border-top: 3px solid var(--amber);
+  background: var(--bg1);
   border-radius: var(--radius-md);
 }
 
@@ -366,7 +370,7 @@
   margin-bottom: var(--space-4);
 }
 
-.monthly-customers {
+.chart-stack {
   margin-bottom: var(--space-4);
 }
 
@@ -383,7 +387,7 @@
 .monthly-table tr.is-active td,
 .monthly-table th.is-active,
 .monthly-table td.is-active {
-  background: rgba(224, 180, 74, 0.22);
+  background: var(--amber-wash);
 }
 
 .rep-targets {
@@ -457,9 +461,9 @@
 .series-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem 1rem;
+  gap: var(--space-1) var(--space-4);
   list-style: none;
-  margin: 0.45rem 0 0.15rem;
+  margin: var(--space-2) 0 var(--space-1);
   padding: 0;
   font-size: 0.82rem;
   color: var(--ink);
@@ -468,11 +472,11 @@
 .series-legend li {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: var(--space-1);
 }
 
 .series-legend__swatch {
-  width: 1rem;
+  width: var(--space-4);
   height: 0.28rem;
   border-radius: 1px;
 }

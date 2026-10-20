@@ -12,7 +12,7 @@ V=(node "$ROOT/.cursor/skills/verify-sales-dashboard/helpers/verify.mjs")
 "${V[@]}" expect-value --label "Review week" --value 2026-W42
 "${V[@]}" expect-value --label "Salesperson" --value all
 "${V[@]}" expect-row --scope "Monthly sales" --row "Oct 2026" --text 'HK$725,442'
-"${V[@]}" expect-text --text "working-day index" --scope "figure:Days in review month · Oct 2026"
+"${V[@]}" expect-text --text "working-day index" --scope "Monthly sales"
 "${V[@]}" expect-text --text "This month" --scope "figure:Days in review month · Oct 2026"
 "${V[@]}" expect-text --text "Last month" --scope "figure:Days in review month · Oct 2026"
 "${V[@]}" screenshot --name month-days --scope "figure:Days in review month · Oct 2026"
