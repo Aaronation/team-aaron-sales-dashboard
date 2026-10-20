@@ -481,6 +481,11 @@
   background: repeating-linear-gradient(90deg, var(--accent) 0 5px, transparent 5px 8px);
 }
 
+.series-legend__swatch--muted {
+  background: var(--accent);
+  opacity: 0.45;
+}
+
 .chart-tip {
   background: var(--paper);
   border: 1px solid var(--line-strong);

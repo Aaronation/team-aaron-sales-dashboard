@@ -1,10 +1,8 @@
 import {
   addMonthsClamped,
   formatMonthLabel,
-  isoWeekKey,
   monthDaily,
   monthKeyFromDate,
-  parseWeekKey,
   shortName,
 } from './aggregates'
 import { isWorkingDay } from './hkHolidays'
@@ -46,14 +44,23 @@ export function previousMonthKey(monthKey: string): string {
   return addMonthsClamped(`${monthKey}-01`, -1).slice(0, 7)
 }
 
-export function weekTick(weekKey: string): string {
-  const parsed = parseWeekKey(weekKey)
-  if (!parsed) return weekKey
-  return `W${String(parsed.week).padStart(2, '0')}`
+export function segmentKey(kind: 'rep', id: string): string {
+  return `${kind}:${id}`
 }
 
-export function segmentKey(kind: 'week' | 'rep', id: string): string {
-  return `${kind}:${id}`
+export type MtdSpan = {
+  monthKey: string
+  /** End of the selected review week, clamped to the review month. */
+  throughDate: string
+  priorMonthKey: string
+  priorMonthLabel: string
+  /** Working days from the 1st through `throughDate`. */
+  workingDayCount: number
+  /**
+   * Last calendar day of the prior span: the working day at the same index.
+   * Null when this window has no working days, or last month has none.
+   */
+  priorThroughDate: string | null
 }
 
 function monthEnd(monthKey: string): string {
@@ -121,57 +128,98 @@ function rankedEntries(totals: Map<string, number>, limit: number): [string, num
 }
 
 /**
- * Top customers in the review month, with sell-out split by the ISO week of each line.
- * Weeks use `isoWeekKey`, the same bucket as the review-week picker.
+ * Month-to-date window for the selected review week, and the prior month’s
+ * matching span. This period runs from the 1st through `throughDate` (the week’s
+ * end). Last month ends on the working day with the same index, not the same
+ * calendar date.
  */
-export function customerWeekStacks(
-  items: LineItem[],
-  monthKey: string,
-  limit = 10,
-): { series: StackSeries[]; bars: StackBar[] } {
-  const totals = new Map<string, number>()
-  const byWeek = new Map<string, Map<string, number>>()
-  for (const row of items) {
-    if (!row.date || !row.customer || monthKeyFromDate(row.date) !== monthKey) continue
-    const week = isoWeekKey(row.date)
-    const amount = row.totalAmount || 0
-    totals.set(row.customer, (totals.get(row.customer) ?? 0) + amount)
-    let weeks = byWeek.get(row.customer)
-    if (!weeks) {
-      weeks = new Map()
-      byWeek.set(row.customer, weeks)
-    }
-    weeks.set(week, (weeks.get(week) ?? 0) + amount)
+export function mtdComparisonSpan(monthKey: string, throughDate: string): MtdSpan {
+  const monthStart = `${monthKey}-01`
+  const monthLast = monthEnd(monthKey)
+  const through = throughDate < monthStart ? monthStart : throughDate > monthLast ? monthLast : throughDate
+  const currentDays = workingDaysOfMonth(monthKey).filter((date) => date <= through)
+  const priorMonthKey = previousMonthKey(monthKey)
+  const priorDays = workingDaysOfMonth(priorMonthKey)
+  const priorThroughDate =
+    currentDays.length === 0 ? null : (priorDays[currentDays.length - 1] ?? priorDays[priorDays.length - 1] ?? null)
+  return {
+    monthKey,
+    throughDate: through,
+    priorMonthKey,
+    priorMonthLabel: formatMonthLabel(priorMonthKey),
+    workingDayCount: currentDays.length,
+    priorThroughDate,
   }
-  const usedWeeks = new Set<string>()
-  const bars = rankedEntries(totals, limit).map(([name, total]) => {
-    const segments: Record<string, number> = {}
-    for (const [week, amount] of byWeek.get(name) ?? []) {
-      if (amount === 0) continue
-      segments[week] = amount
-      usedWeeks.add(week)
-    }
-    return { name, total, segments }
-  })
-  const series = [...usedWeeks]
-    .sort()
-    .map((weekKey) => ({ key: weekKey, label: weekTick(weekKey) }))
-  return { series, bars }
+}
+
+export type CustomerMomBar = {
+  name: string
+  current: number
+  /** Null when last month has no loaded lines. Zero means the span had no sales. */
+  prior: number | null
+}
+
+export type CustomerMom = {
+  span: MtdSpan
+  hasPrior: boolean
+  bars: CustomerMomBar[]
+}
+
+function inMonthThrough(date: string, monthKey: string, throughDate: string): boolean {
+  return monthKeyFromDate(date) === monthKey && date <= throughDate
 }
 
 /**
- * Top product models in the review month by quantity, split by salesperson.
+ * Top customers for the review-month MTD window, each with last month’s sell-out
+ * on the matching working-day span. `items` should already follow salesperson,
+ * department, and search.
+ */
+export function customerWorkingDayMom(
+  items: LineItem[],
+  monthKey: string,
+  throughDate: string,
+  limit = 10,
+): CustomerMom {
+  const span = mtdComparisonSpan(monthKey, throughDate)
+  const hasPrior = items.some(
+    (row) => row.date != null && monthKeyFromDate(row.date) === span.priorMonthKey,
+  )
+  const currentTotals = new Map<string, number>()
+  const priorTotals = new Map<string, number>()
+  for (const row of items) {
+    if (!row.date || !row.customer) continue
+    const amount = row.totalAmount || 0
+    if (inMonthThrough(row.date, monthKey, span.throughDate)) {
+      currentTotals.set(row.customer, (currentTotals.get(row.customer) ?? 0) + amount)
+    }
+    if (span.priorThroughDate && inMonthThrough(row.date, span.priorMonthKey, span.priorThroughDate)) {
+      priorTotals.set(row.customer, (priorTotals.get(row.customer) ?? 0) + amount)
+    }
+  }
+  const bars = rankedEntries(currentTotals, limit).map(([name, current]) => ({
+    name,
+    current,
+    prior: hasPrior ? (priorTotals.get(name) ?? 0) : null,
+  }))
+  return { span, hasPrior, bars }
+}
+
+/**
+ * Top product models by quantity, split by salesperson, for the review-month
+ * MTD window (the 1st through `throughDate`).
  * Model identity matches the existing chart: product model, or SKU when the model is empty.
  */
 export function modelRepStacks(
   items: LineItem[],
   monthKey: string,
+  throughDate: string,
   limit = 10,
 ): { series: StackSeries[]; bars: StackBar[] } {
+  const through = mtdComparisonSpan(monthKey, throughDate).throughDate
   const totals = new Map<string, { quantity: number; revenue: number }>()
   const byRep = new Map<string, Map<string, { quantity: number; revenue: number }>>()
   for (const row of items) {
-    if (!row.date || monthKeyFromDate(row.date) !== monthKey) continue
+    if (!row.date || !inMonthThrough(row.date, monthKey, through)) continue
     const model = row.productModel || row.sku
     if (!model) continue
     const rep = row.salesperson || 'Unassigned'

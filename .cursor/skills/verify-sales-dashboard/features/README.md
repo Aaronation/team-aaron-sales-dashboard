@@ -45,7 +45,7 @@ Each feature file starts with an H1 and one paragraph, then exactly these H2 sec
 
 - [Review week](./review-week.md) — pick an ISO week and compare it with the same calendar dates last month.
 - [Reps, customers, and SKUs](./rep-customer-sku.md) — filter the week, read the rep board, and page the invoice table.
-- [Monthly sales](./monthly-sales.md) — month totals for the loaded lines. The review week does not clip them. Days compare last month by working-day index; customer bars stack weeks; model bars stack reps.
+- [Monthly sales](./monthly-sales.md) — month totals for the loaded lines. The review week does not clip the month table. Days compare last month by working-day index. Top customers and top models are month-to-date through the selected week; customers pair this period with last month’s matching working-day span, and model bars stack reps.
 - [Sell-out pie](./sell-out-pie.md) — each rep's share of the review week's calendar month.
 - [Hand import](./hand-import.md) — merge, replace, or reset from a CSV, Excel, or JSON file, including the sample export.
 - [Persist and forecast](./persist-and-forecast.md) — a saved import survives refresh, reset clears it, and the scorecard shows target, pace, and forecast.

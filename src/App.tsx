@@ -35,7 +35,7 @@ import {
   weekDateRange,
   weekLabel,
 } from './lib/aggregates'
-import { customerWeekStacks, modelRepStacks, monthDailyComparison } from './lib/chartSeries'
+import { customerWorkingDayMom, modelRepStacks, monthDailyComparison } from './lib/chartSeries'
 import { forecastForReview, forecastScopeNote, reviewTarget } from './lib/forecast'
 import { mtdWorkingDays } from './lib/hkHolidays'
 import { initialFilters, reconcileFilters } from './lib/filters'
@@ -203,13 +203,20 @@ export default function App() {
     () => (shareMonthKey ? monthDailyComparison(monthScoped, shareMonthKey) : null),
     [monthScoped, shareMonthKey],
   )
-  const customerStacks = useMemo(
-    () => (shareMonthKey ? customerWeekStacks(monthScoped, shareMonthKey) : { series: [], bars: [] }),
-    [monthScoped, shareMonthKey],
+  const mtdThrough = selectedRange?.end ?? null
+  const customerMom = useMemo(
+    () =>
+      shareMonthKey && mtdThrough
+        ? customerWorkingDayMom(monthScoped, shareMonthKey, mtdThrough)
+        : null,
+    [monthScoped, shareMonthKey, mtdThrough],
   )
   const modelStacks = useMemo(
-    () => (shareMonthKey ? modelRepStacks(monthScoped, shareMonthKey) : { series: [], bars: [] }),
-    [monthScoped, shareMonthKey],
+    () =>
+      shareMonthKey && mtdThrough
+        ? modelRepStacks(monthScoped, shareMonthKey, mtdThrough)
+        : { series: [], bars: [] },
+    [monthScoped, shareMonthKey, mtdThrough],
   )
   const weekInvoices = useMemo(
     () => invoiceCountsBy(thisWeek, (row) => row.salesperson),
@@ -440,8 +447,9 @@ export default function App() {
         showTarget={filters.salesperson === 'all'}
         repRows={repRows}
         dayComparison={dayComparison}
-        customerStacks={customerStacks}
+        customerMom={customerMom}
         modelStacks={modelStacks}
+        mtdThroughLabel={mtdThrough ? mtdThrough.slice(5) : null}
         salesperson={filters.salesperson}
       />
 

@@ -25,6 +25,7 @@ import {
 import {
   orderSeriesLikeShares,
   segmentKey,
+  type CustomerMom,
   type MonthDayComparison,
   type StackBar,
   type StackSeries,
@@ -63,6 +64,24 @@ function DayTooltip({
         Last month{row.priorLabel ? ` · ${row.priorLabel}` : ''} ·{' '}
         {row.priorRevenue == null ? '—' : formatMoney(row.priorRevenue)}
       </p>
+    </div>
+  )
+}
+
+function MomTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean
+  payload?: { payload?: { fullName?: string; current?: number; prior?: number | null } }[]
+}) {
+  const row = payload?.[0]?.payload
+  if (!active || !row) return null
+  return (
+    <div className="chart-tip">
+      <p className="chart-tip__title">{row.fullName}</p>
+      <p>This period · {formatMoney(row.current ?? 0)}</p>
+      {row.prior == null ? null : <p>Last month · {formatMoney(row.prior)}</p>}
     </div>
   )
 }
@@ -116,8 +135,9 @@ type Props = {
   showTarget: boolean
   repRows: RepAchievement[]
   dayComparison: MonthDayComparison | null
-  customerStacks: { series: StackSeries[]; bars: StackBar[] }
+  customerMom: CustomerMom | null
   modelStacks: { series: StackSeries[]; bars: StackBar[] }
+  mtdThroughLabel: string | null
   salesperson: string
 }
 
@@ -135,8 +155,9 @@ export function MonthlySales({
   showTarget,
   repRows,
   dayComparison,
-  customerStacks,
+  customerMom,
   modelStacks,
+  mtdThroughLabel,
   salesperson,
 }: Props) {
   const chartRows = months.map((month) => ({
@@ -161,15 +182,11 @@ export function MonthlySales({
   const modelTitle = repLabel
     ? `${repLabel} top product models · ${shareLabel}`
     : `Top product models · ${shareLabel}`
-  const topCustomers = customerStacks.bars.map((customer) => ({
+  const topCustomers = (customerMom?.bars ?? []).map((customer) => ({
     name: tickLabel(customer.name, 24),
     fullName: customer.name,
-    ...Object.fromEntries(
-      customerStacks.series.map((series) => [
-        segmentKey('week', series.key),
-        Math.round(customer.segments[series.key] ?? 0),
-      ]),
-    ),
+    current: Math.round(customer.current),
+    prior: customer.prior == null ? null : Math.round(customer.prior),
   }))
   const modelSeries = orderSeriesLikeShares(modelStacks.series, shares)
   const topModels = modelStacks.bars.map((model) => ({
@@ -374,34 +391,47 @@ export function MonthlySales({
       <figure className="chart-panel monthly-customers">
         <figcaption>{customerTitle}</figcaption>
         <p className="monthly__caption">
-          Top 10 by sell-out (HKD) for the review month. Each bar stacks the ISO weeks in that
-          month. Follows the salesperson, department, and search filters.
+          {customerMom
+            ? `Top 10 by sell-out (HKD) from the start of ${shareLabel} through ${mtdThroughLabel}. ${
+                customerMom.hasPrior
+                  ? `Last month is the same working-day count (${customerMom.span.workingDayCount} working days), through ${customerMom.span.priorThroughDate?.slice(5)}, aligned by working-day index.`
+                  : `No ${customerMom.span.priorMonthLabel} lines are loaded, so there is no comparison bar.`
+              }`
+            : 'Choose a review week to see month-to-date customers.'}{' '}
+          Follows the salesperson, department, and search filters.
         </p>
         {topCustomers.length === 0 ? (
           <p className="monthly__empty">No customers in {shareLabel}.</p>
         ) : (
           <>
-            <SeriesLegend
-              items={customerStacks.series.map((series, index) => ({
-                label: series.label,
-                color: sliceColorAt(index),
-              }))}
-            />
-            <ResponsiveContainer width="100%" height={380}>
-              <BarChart data={topCustomers} layout="vertical" margin={{ left: 8, right: 16 }}>
+            <ul className="series-legend">
+              <li>
+                <span className="series-legend__swatch" style={{ background: TAUPE }} />
+                This period
+              </li>
+              {customerMom?.hasPrior ? (
+                <li>
+                  <span className="series-legend__swatch series-legend__swatch--muted" />
+                  Last month
+                </li>
+              ) : null}
+            </ul>
+            <ResponsiveContainer width="100%" height={520}>
+              <BarChart data={topCustomers} layout="vertical" margin={{ left: 8, right: 16 }} barGap={2}>
                 <CartesianGrid strokeDasharray="3 3" stroke={GRID} horizontal={false} />
                 <XAxis type="number" tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} />
                 <YAxis type="category" dataKey="name" width={196} tick={CustomerTick} />
-                <Tooltip content={<StackTooltip format={(value) => formatMoney(value)} />} />
-                {customerStacks.series.map((series, index) => (
+                <Tooltip content={<MomTooltip />} />
+                <Bar dataKey="current" name="This period" fill={TAUPE} isAnimationActive={false} />
+                {customerMom?.hasPrior ? (
                   <Bar
-                    key={series.key}
-                    dataKey={segmentKey('week', series.key)}
-                    name={series.label}
-                    stackId="week"
-                    fill={sliceColorAt(index)}
+                    dataKey="prior"
+                    name="Last month"
+                    fill={OLIVE}
+                    fillOpacity={0.45}
+                    isAnimationActive={false}
                   />
-                ))}
+                ) : null}
               </BarChart>
             </ResponsiveContainer>
           </>
@@ -411,9 +441,9 @@ export function MonthlySales({
       <figure className="chart-panel monthly-customers">
         <figcaption>{modelTitle}</figcaption>
         <p className="monthly__caption">
-          Top 10 product models by quantity for the review month. Each bar stacks quantity by
-          salesperson, using the sell-out pie colors. Follows the salesperson, department, and
-          search filters.
+          Top 10 product models by quantity from the start of {shareLabel} through{' '}
+          {mtdThroughLabel ?? 'the selected week'}. Each bar stacks quantity by salesperson, using
+          the sell-out pie colors. Follows the salesperson, department, and search filters.
         </p>
         {topModels.length === 0 ? (
           <p className="monthly__empty">No product models in {shareLabel}.</p>

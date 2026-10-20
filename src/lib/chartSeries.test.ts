@@ -1,15 +1,15 @@
 /// <reference types="node" />
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { isoWeekKey, monthDaily, monthKeyFromDate } from './aggregates'
+import { monthDaily, monthKeyFromDate } from './aggregates'
 import {
-  customerWeekStacks,
+  customerWorkingDayMom,
   modelRepStacks,
   monthDailyComparison,
+  mtdComparisonSpan,
   orderSeriesLikeShares,
   previousMonthKey,
   segmentKey,
-  weekTick,
   workingDaysOfMonth,
 } from './chartSeries'
 import type { LineItem, SalesPayload } from './types'
@@ -105,46 +105,79 @@ describe('working-day month comparison', () => {
   })
 })
 
-describe('customer weeks and model reps', () => {
-  it('stacks a customer by ISO week and keeps the top customers', () => {
-    const early = '2026-10-02'
-    const later = '2026-10-06'
+describe('customer working-day MoM and model reps', () => {
+  it('compares each customer on the same working-day count, including days inside that span', () => {
     const items = [
-      line(early, 10, { customer: 'Harbour', invoice: 'a' }),
-      line(later, 30, { customer: 'Harbour', invoice: 'b' }),
-      line(early, 100, { customer: 'Vision', invoice: 'c' }),
-      line('2026-09-01', 500, { customer: 'Vision', invoice: 'old' }),
+      line('2026-10-03', 40, { customer: 'Harbour', invoice: 'sat' }),
+      line('2026-10-16', 10, { customer: 'Harbour', invoice: 'fri' }),
+      line('2026-10-19', 999, { customer: 'Harbour', invoice: 'after' }),
+      line('2026-10-12', 100, { customer: 'Vision', invoice: 'vis' }),
+      line('2026-09-01', 3, { customer: 'Harbour', invoice: 'sep1' }),
+      line('2026-09-05', 7, { customer: 'Harbour', invoice: 'sep-sat' }),
+      line('2026-09-16', 500, { customer: 'Harbour', invoice: 'sep-late' }),
     ]
-    const stacks = customerWeekStacks(items, '2026-10', 10)
-    expect(stacks.bars.map((bar) => bar.name)).toEqual(['Vision', 'Harbour'])
-    expect(stacks.bars[0]).toMatchObject({ total: 100 })
-    expect(stacks.bars[1]?.total).toBe(40)
-    const earlyWeek = isoWeekKey(early)
-    const laterWeek = isoWeekKey(later)
-    expect(stacks.series.map((series) => series.key)).toEqual([earlyWeek, laterWeek].sort())
-    expect(stacks.series.map((series) => series.label)).toEqual(
-      [earlyWeek, laterWeek].sort().map((week) => weekTick(week)),
-    )
-    expect(stacks.bars[1]?.segments[earlyWeek]).toBe(10)
-    expect(stacks.bars[1]?.segments[laterWeek]).toBe(30)
-    expect(segmentKey('week', earlyWeek)).toBe(`week:${earlyWeek}`)
+    const mom = customerWorkingDayMom(items, '2026-10', '2026-10-18')
+    expect(mom.span.workingDayCount).toBe(11)
+    expect(mom.span.throughDate).toBe('2026-10-18')
+    expect(mom.span.priorThroughDate).toBe('2026-09-15')
+    expect(mom.hasPrior).toBe(true)
+    expect(mom.bars.map((bar) => bar.name)).toEqual(['Vision', 'Harbour'])
+    expect(mom.bars[0]).toMatchObject({ current: 100, prior: 0 })
+    expect(mom.bars[1]).toMatchObject({ current: 50, prior: 10 })
+    expect(segmentKey('rep', 'Aaron Chang')).toBe('rep:Aaron Chang')
   })
 
-  it('stacks product models by salesperson quantity', () => {
+  it('shortens both charts when the selected week ends earlier in the month', () => {
+    const items = [
+      line('2026-10-06', 20, { customer: 'Harbour', invoice: 'early' }),
+      line('2026-10-12', 80, { customer: 'Harbour', invoice: 'later' }),
+      line('2026-09-01', 5, { customer: 'Harbour', invoice: 'sep' }),
+      line('2026-09-09', 15, { customer: 'Harbour', invoice: 'sep-after-6' }),
+    ]
+    const early = customerWorkingDayMom(items, '2026-10', '2026-10-11')
+    const later = customerWorkingDayMom(items, '2026-10', '2026-10-18')
+    expect(early.span).toMatchObject({ workingDayCount: 6, priorThroughDate: '2026-09-08' })
+    expect(early.bars[0]).toMatchObject({ current: 20, prior: 5 })
+    expect(later.bars[0]).toMatchObject({ current: 100, prior: 20 })
+  })
+
+  it('drops the last-month bar when that month has no lines, and follows the salesperson filter', () => {
+    const items = [
+      line('2026-08-03', 40, { customer: 'Harbour', salesperson: 'Aaron Chang', invoice: 'a' }),
+      line('2026-08-04', 15, { customer: 'Vision', salesperson: 'Kelvin Lai', invoice: 'k' }),
+    ]
+    const all = customerWorkingDayMom(items, '2026-08', '2026-08-09')
+    expect(all.hasPrior).toBe(false)
+    expect(all.span.priorMonthKey).toBe('2026-07')
+    expect(all.span.priorThroughDate).toBe('2026-07-08')
+    expect(all.bars.every((bar) => bar.prior == null)).toBe(true)
+    const kelvin = customerWorkingDayMom(
+      items.filter((row) => row.salesperson === 'Kelvin Lai'),
+      '2026-08',
+      '2026-08-09',
+    )
+    expect(kelvin.bars.map((bar) => bar.name)).toEqual(['Vision'])
+    expect(kelvin.bars[0]?.current).toBe(15)
+  })
+
+  it('stacks product models by salesperson quantity inside the MTD window', () => {
     const items = [
       line('2026-10-02', 20, { productModel: 'PX20', salesperson: 'Aaron Chang', quantity: 2, invoice: 'a' }),
       line('2026-10-05', 50, { productModel: 'PX20', salesperson: 'Kelvin Lai', quantity: 5, invoice: 'b' }),
       line('2026-10-06', 90, { productModel: 'LED1', salesperson: 'Aaron Chang', quantity: 9, invoice: 'c' }),
+      line('2026-10-12', 40, { productModel: 'LED1', salesperson: 'Aaron Chang', quantity: 4, invoice: 'late' }),
       line('2026-10-06', 10, { productModel: null, sku: 'BARE', salesperson: 'Kenny Ma', quantity: 4, invoice: 'd' }),
     ]
-    const stacks = modelRepStacks(items, '2026-10')
-    expect(stacks.bars.map((bar) => bar.name)).toEqual(['LED1', 'PX20', 'BARE'])
-    expect(stacks.bars[1]?.total).toBe(7)
-    expect(stacks.bars[1]?.segments['Aaron Chang']).toBe(2)
-    expect(stacks.bars[1]?.segments['Kelvin Lai']).toBe(5)
-    expect(stacks.series.map((series) => series.label)).toEqual(['Aaron', 'Kelvin', 'Kenny'])
+    const early = modelRepStacks(items, '2026-10', '2026-10-11')
+    expect(early.bars.map((bar) => bar.name)).toEqual(['LED1', 'PX20', 'BARE'])
+    expect(early.bars[0]?.total).toBe(9)
+    const full = modelRepStacks(items, '2026-10', '2026-10-18')
+    expect(full.bars[0]).toMatchObject({ name: 'LED1', total: 13 })
+    expect(full.bars.find((bar) => bar.name === 'PX20')?.segments['Aaron Chang']).toBe(2)
+    expect(full.bars.find((bar) => bar.name === 'PX20')?.segments['Kelvin Lai']).toBe(5)
+    expect(full.series.map((series) => series.label)).toEqual(['Aaron', 'Kelvin', 'Kenny'])
 
-    const ordered = orderSeriesLikeShares(stacks.series, [
+    const ordered = orderSeriesLikeShares(full.series, [
       { name: 'Kelvin Lai' },
       { name: 'Aaron Chang' },
       { name: 'Kenny Ma' },
@@ -152,17 +185,33 @@ describe('customer weeks and model reps', () => {
     expect(ordered.map((series) => series.key)).toEqual(['Kelvin Lai', 'Aaron Chang', 'Kenny Ma'])
   })
 
-  it('uses the seeded October weeks and reps for the visible stacks', () => {
+  it('uses the seeded October MTD window for customers and reps', () => {
     const payload = JSON.parse(readFileSync('public/data/sales-line-items.json', 'utf8')) as SalesPayload
-    const customers = customerWeekStacks(payload.lineItems, '2026-10')
-    const models = modelRepStacks(payload.lineItems, '2026-10')
-    expect(customers.bars).toHaveLength(10)
-    expect(customers.series.map((series) => series.label)).toEqual(['W40', 'W41', 'W42'])
-    for (const bar of customers.bars) {
-      const stacked = Object.values(bar.segments).reduce((sum, amount) => sum + amount, 0)
-      expect(stacked).toBeCloseTo(bar.total, 6)
-    }
+    const throughWeek = customerWorkingDayMom(payload.lineItems, '2026-10', '2026-10-18')
+    const throughEarlier = customerWorkingDayMom(payload.lineItems, '2026-10', '2026-10-11')
+    const models = modelRepStacks(payload.lineItems, '2026-10', '2026-10-18')
+    const modelsEarlier = modelRepStacks(payload.lineItems, '2026-10', '2026-10-11')
+    expect(mtdComparisonSpan('2026-10', '2026-10-18')).toMatchObject({
+      workingDayCount: 11,
+      priorThroughDate: '2026-09-15',
+    })
+    expect(throughWeek.bars).toHaveLength(10)
+    expect(throughWeek.hasPrior).toBe(true)
+    expect(throughWeek.bars.every((bar) => bar.prior != null && bar.current > 0)).toBe(true)
+    const weekTotal = throughWeek.bars.reduce((sum, bar) => sum + bar.current, 0)
+    const earlierTotal = throughEarlier.bars.reduce((sum, bar) => sum + bar.current, 0)
+    expect(earlierTotal).toBeLessThan(weekTotal)
+    const kelvin = customerWorkingDayMom(
+      payload.lineItems.filter((row) => row.salesperson === 'Kelvin Lai'),
+      '2026-10',
+      '2026-10-18',
+    )
+    expect(kelvin.bars.length).toBeGreaterThan(0)
+    expect(kelvin.bars.reduce((sum, bar) => sum + bar.current, 0)).toBeLessThan(weekTotal)
     expect(models.series.map((series) => series.label)).toEqual(['Aaron', 'Kelvin', 'Kenny'])
     expect(models.bars[0]?.name).not.toMatch(/Aaron|Kelvin|Kenny/)
+    const modelQty = models.bars.reduce((sum, bar) => sum + bar.total, 0)
+    const earlierQty = modelsEarlier.bars.reduce((sum, bar) => sum + bar.total, 0)
+    expect(earlierQty).toBeLessThan(modelQty)
   })
 })
