@@ -23,7 +23,9 @@ V=(node "$ROOT/.cursor/skills/verify-sales-dashboard/helpers/verify.mjs")
 "${V[@]}" expect-text --text "This period" --scope "figure:Top customers · Oct 2026"
 "${V[@]}" expect-text --text "Last month" --scope "figure:Top customers · Oct 2026"
 "${V[@]}" expect-text --text "Vision" --scope "figure:Top customers · Oct 2026"
-"${V[@]}" expect-absent --text "W40" --scope "figure:Top customers · Oct 2026"
+"${V[@]}" expect-text --text "W40" --scope "figure:Top customers · Oct 2026"
+"${V[@]}" expect-text --text "W41" --scope "figure:Top customers · Oct 2026"
+"${V[@]}" expect-text --text "W42" --scope "figure:Top customers · Oct 2026"
 "${V[@]}" screenshot --name month-customers --scope "figure:Top customers · Oct 2026"
 
 "${V[@]}" expect-text --text "through 10-18" --scope "figure:Top product models · Oct 2026"
@@ -59,6 +61,9 @@ V=(node "$ROOT/.cursor/skills/verify-sales-dashboard/helpers/verify.mjs")
 "${V[@]}" expect-text --text "through 10-11" --scope "figure:Top customers · Oct 2026"
 "${V[@]}" expect-text --text "6 working days" --scope "figure:Top customers · Oct 2026"
 "${V[@]}" expect-text --text "through 09-08" --scope "figure:Top customers · Oct 2026"
+"${V[@]}" expect-text --text "W40" --scope "figure:Top customers · Oct 2026"
+"${V[@]}" expect-text --text "W41" --scope "figure:Top customers · Oct 2026"
+"${V[@]}" expect-absent --text "W42" --scope "figure:Top customers · Oct 2026"
 "${V[@]}" expect-text --text "through 10-11" --scope "figure:Top product models · Oct 2026"
 "${V[@]}" expect-row --scope "Monthly sales" --row "Oct 2026" --text 'HK$725,442'
 "${V[@]}" screenshot --name month-customers-w41 --scope "figure:Top customers · Oct 2026"

@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { monthDaily, monthKeyFromDate } from './aggregates'
+import { AMBER, CLAY, CREAM, SAGE, TAUPE, customerWeekFill } from './palette'
 import {
   customerWorkingDayMom,
   modelRepStacks,
@@ -124,7 +125,15 @@ describe('customer working-day MoM and model reps', () => {
     expect(mom.bars.map((bar) => bar.name)).toEqual(['Vision', 'Harbour'])
     expect(mom.bars[0]).toMatchObject({ current: 100, prior: 0 })
     expect(mom.bars[1]).toMatchObject({ current: 50, prior: 10 })
-    expect(segmentKey('rep', 'Aaron Chang')).toBe('rep:Aaron Chang')
+    expect(mom.weeks.map((week) => week.label)).toEqual(['W40', 'W42'])
+    expect(Object.values(mom.bars[1]?.weeks ?? {}).reduce((sum, amount) => sum + amount, 0)).toBe(50)
+    expect(mom.bars[0]?.weeks[mom.weeks[1]?.key ?? '']).toBe(100)
+    expect(segmentKey('week', mom.weeks[0]?.key ?? '')).toBe(`week:${mom.weeks[0]?.key}`)
+    expect(customerWeekFill(0)).toBe(CREAM)
+    expect(customerWeekFill(1)).toBe(SAGE)
+    expect(customerWeekFill(2)).toBe(AMBER)
+    expect(customerWeekFill(3)).toBe(CLAY)
+    expect(customerWeekFill(4)).toBe(TAUPE)
   })
 
   it('shortens both charts when the selected week ends earlier in the month', () => {
@@ -137,7 +146,9 @@ describe('customer working-day MoM and model reps', () => {
     const early = customerWorkingDayMom(items, '2026-10', '2026-10-11')
     const later = customerWorkingDayMom(items, '2026-10', '2026-10-18')
     expect(early.span).toMatchObject({ workingDayCount: 6, priorThroughDate: '2026-09-08' })
+    expect(early.weeks.map((week) => week.label)).toEqual(['W41'])
     expect(early.bars[0]).toMatchObject({ current: 20, prior: 5 })
+    expect(later.weeks.map((week) => week.label)).toEqual(['W41', 'W42'])
     expect(later.bars[0]).toMatchObject({ current: 100, prior: 20 })
   })
 
@@ -195,9 +206,15 @@ describe('customer working-day MoM and model reps', () => {
       workingDayCount: 11,
       priorThroughDate: '2026-09-15',
     })
+    expect(throughWeek.weeks.map((week) => week.label)).toEqual(['W40', 'W41', 'W42'])
+    expect(throughEarlier.weeks.map((week) => week.label)).toEqual(['W40', 'W41'])
     expect(throughWeek.bars).toHaveLength(10)
     expect(throughWeek.hasPrior).toBe(true)
     expect(throughWeek.bars.every((bar) => bar.prior != null && bar.current > 0)).toBe(true)
+    for (const bar of throughWeek.bars) {
+      const stacked = Object.values(bar.weeks).reduce((sum, amount) => sum + amount, 0)
+      expect(stacked).toBeCloseTo(bar.current, 6)
+    }
     const weekTotal = throughWeek.bars.reduce((sum, bar) => sum + bar.current, 0)
     const earlierTotal = throughEarlier.bars.reduce((sum, bar) => sum + bar.current, 0)
     expect(earlierTotal).toBeLessThan(weekTotal)

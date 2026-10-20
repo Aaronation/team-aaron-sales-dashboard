@@ -30,7 +30,7 @@ import {
   type StackBar,
   type StackSeries,
 } from '../lib/chartSeries'
-import { AMBER, GRID, INK, LIGHT_SLICE_FILLS, OLIVE, TAUPE, customerBarColor, sliceColorAt } from '../lib/palette'
+import { AMBER, GRID, INK, LIGHT_SLICE_FILLS, OLIVE, TAUPE, customerBarColor, customerWeekFill, sliceColorAt } from '../lib/palette'
 
 function SeriesLegend({ items }: { items: { label: string; color: string }[] }) {
   return (
@@ -187,6 +187,12 @@ export function MonthlySales({
     fullName: customer.name,
     current: Math.round(customer.current),
     prior: customer.prior == null ? null : Math.round(customer.prior),
+    ...Object.fromEntries(
+      (customerMom?.weeks ?? []).map((week) => [
+        segmentKey('week', week.key),
+        Math.round(customer.weeks[week.key] ?? 0),
+      ]),
+    ),
   }))
   const modelSeries = orderSeriesLikeShares(modelStacks.series, shares)
   const topModels = modelStacks.bars.map((model) => ({
@@ -395,9 +401,9 @@ export function MonthlySales({
         <figcaption>{customerTitle}</figcaption>
         <p className="monthly__caption">
           {customerMom?.hasPrior && customerMom.span.priorThroughDate
-            ? `Top 10 by sell-out from the start of ${shareLabel} through ${mtdThroughLabel} (${customerMom.span.workingDayCount} working days), compared with last month through ${customerMom.span.priorThroughDate.slice(5)}.`
+            ? `This period stacks weeks from the start of ${shareLabel} through ${mtdThroughLabel} (${customerMom.span.workingDayCount} working days), compared with last month through ${customerMom.span.priorThroughDate.slice(5)}.`
             : customerMom
-              ? `No ${customerMom.span.priorMonthLabel} lines are loaded, so the top 10 run from the start of ${shareLabel} through ${mtdThroughLabel} with no comparison bar.`
+              ? `No ${customerMom.span.priorMonthLabel} lines are loaded, so this period stacks weeks from the start of ${shareLabel} through ${mtdThroughLabel} with no comparison bar.`
               : 'Choose a review week to see month-to-date customers.'}
         </p>
         {topCustomers.length === 0 ? (
@@ -405,10 +411,12 @@ export function MonthlySales({
         ) : (
           <>
             <ul className="series-legend">
-              <li>
-                <span className="series-legend__swatch" style={{ background: TAUPE }} />
-                This period
-              </li>
+              {(customerMom?.weeks ?? []).map((week, index) => (
+                <li key={week.key}>
+                  <span className="series-legend__swatch" style={{ background: customerWeekFill(index) }} />
+                  {week.label}
+                </li>
+              ))}
               {customerMom?.hasPrior ? (
                 <li>
                   <span className="series-legend__swatch series-legend__swatch--muted" />
@@ -422,7 +430,18 @@ export function MonthlySales({
                 <XAxis type="number" tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} />
                 <YAxis type="category" dataKey="name" width={196} tick={CustomerTick} />
                 <Tooltip content={<MomTooltip />} />
-                <Bar dataKey="current" name="This period" fill={TAUPE} isAnimationActive={false} />
+                {(customerMom?.weeks ?? []).map((week, index) => (
+                  <Bar
+                    key={week.key}
+                    dataKey={segmentKey('week', week.key)}
+                    name={week.label}
+                    stackId="current"
+                    fill={customerWeekFill(index)}
+                    stroke={TAUPE}
+                    strokeWidth={1}
+                    isAnimationActive={false}
+                  />
+                ))}
                 {customerMom?.hasPrior ? (
                   <Bar
                     dataKey="prior"
