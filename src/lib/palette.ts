@@ -37,6 +37,16 @@ export function sliceColorAt(index: number): string {
 }
 
 /**
+ * This-period customer weeks, earliest week first: cream, sand, amber, clay.
+ * Sand is SAGE. Olive is not in this ramp.
+ */
+export const CUSTOMER_WEEK_FILLS = [CREAM, SAGE, AMBER, CLAY] as const
+
+export function customerWeekFill(index: number): string {
+  return CUSTOMER_WEEK_FILLS[index] ?? TAUPE
+}
+
+/**
  * Bar color for a selected salesperson. Index matches the pie: revenue above zero,
  * highest sell-out first.
  */

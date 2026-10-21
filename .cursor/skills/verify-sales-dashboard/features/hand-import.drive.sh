@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Drive hand-import once. Requires `verify.mjs launch` to have passed doctor.
-# Does not start or stop the server. `open` loads a fresh seed session.
+# Does not start or stop the server. On a fresh profile, `open` loads the bundled seed.
 # HKD amounts are single-quoted so bash does not expand $3 inside HK$30,000.
 set -euo pipefail
 export LANG="${LANG:-C.UTF-8}"

@@ -11,7 +11,7 @@ The page is one URL. There is no login and no Kingdee sync control.
 - `node .cursor/skills/verify-sales-dashboard/helpers/verify.mjs launch` has exited 0. Default base URL is `http://127.0.0.1:4174`.
 - `node .cursor/skills/verify-sales-dashboard/helpers/verify.mjs doctor` reports `seed_matches_checkout=yes`, `heading=Weekly manager review`, `locale=en-HK`, and `viewport=1440x900`.
 - Drive commands use that same run. Set `VERIFY_RUN_ID` when it is not the latest launch.
-- Start each feature from `open`, which loads the bundled seed. A later command in the same process sees in-memory imports until the next `open`.
+- Start each feature from `open`. On a fresh drive that loads the bundled seed. A saved Merge or Replace comes back on the next `open` in the same browser. **Reset to seed** clears it.
 - Never drive a Vite process this run did not start. Never `pkill` by process name.
 
 ## Driving conventions
@@ -22,7 +22,7 @@ The page is one URL. There is no login and no Kingdee sync control.
 - Assert visible HTML text (tables, share list, hero, footer). Recharts SVG is not the proof.
 - The helper's browser locale is `en-HK`, so money renders as `HK$30,000`. The sample merge note says `10,118 rows now` (distinct line keys after merge, not 10,121+5).
 - In shell commands, put `HK$` amounts in single quotes so bash does not expand `$`.
-- Restore the seed with `open` or the `Reset to seed` button before a later feature. Do not delete proof files during cleanup.
+- Restore the seed with `Reset to seed` before a later feature that expects the bundled file. `open` keeps a saved import. Do not delete proof files during cleanup.
 
 ## Proof and skip reporting
 
@@ -45,6 +45,7 @@ Each feature file starts with an H1 and one paragraph, then exactly these H2 sec
 
 - [Review week](./review-week.md) — pick an ISO week and compare it with the same calendar dates last month.
 - [Reps, customers, and SKUs](./rep-customer-sku.md) — filter the week, read the rep board, and page the invoice table.
-- [Monthly sales](./monthly-sales.md) — month totals for the loaded lines. The review week does not clip them.
+- [Monthly sales](./monthly-sales.md) — month totals for the loaded lines. The review week does not clip the month table. Days compare last month by working-day index. Top customers and top models are month-to-date through the selected week; customers pair this period with last month’s matching working-day span, and model bars stack reps.
 - [Sell-out pie](./sell-out-pie.md) — each rep's share of the review week's calendar month.
 - [Hand import](./hand-import.md) — merge, replace, or reset from a CSV, Excel, or JSON file, including the sample export.
+- [Persist and forecast](./persist-and-forecast.md) — a saved import survives refresh, reset clears it, and the scorecard shows target, pace, and forecast.

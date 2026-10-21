@@ -7,7 +7,8 @@
  * Replace swaps the working set for the ingested rows and does not rematch.
  */
 import { describe, expect, it } from 'vitest'
-import { groupBy, sumRevenue } from './aggregates'
+import { filterItems, groupBy, isoWeekKey, listWeekKeys, sumRevenue } from './aggregates'
+import { reconcileFilters } from './filters'
 import { ingestRecords, mergeImportedItems, recordsFromMatrix } from './ingest'
 import { WGAL_PARTNER_ALIASES } from './partnerAliases'
 import type { LineItem } from './types'
@@ -195,5 +196,170 @@ describe('merge into current vs replace', () => {
     expect(sumRevenue(replaced.lineItems)).toBe(sumRevenue(incoming))
     // Alias rematch runs on Merge only. Replace keeps the customer text ingest stored.
     expect(replaced.lineItems.map((row) => row.customer)).toEqual([VISION_PARTNER, VISION_PARTNER])
+  })
+})
+
+/** Headers from the Kingdee English “List Data” export (Team-20261020). */
+const ENGLISH_EXPORT_HEADERS = [
+  'No.',
+  'Document Number',
+  'Trading Partner',
+  'Business Date',
+  'Amount',
+  'Sales Department',
+  'Salesperson',
+  'Material Code',
+  'Material Name',
+  'Quantity',
+  'Unit Price',
+  'Tax-Inclusive Amount',
+  'Specification',
+  'Customer code',
+  '销售出库单备注',
+  '产品型号',
+]
+
+describe('English Kingdee List Data export', () => {
+  it('reads Business Date, the tax-inclusive line amount, and 产品型号', () => {
+    const incoming = ingestSheet([
+      ENGLISH_EXPORT_HEADERS,
+      [
+        2,
+        'GAL26-10-20-001',
+        'Wonderland 奇趣天地',
+        '2026-10-20',
+        null,
+        'Galaxy',
+        'Aaron Chang',
+        'KS-726DG',
+        null,
+        1,
+        88,
+        88,
+        'Dretec 2KG電子料理磅(最少0.1g) 黑色',
+        'C001',
+        '',
+        'KS-726',
+      ],
+      [
+        3,
+        'GAL26-10-20-001',
+        'Wonderland 奇趣天地',
+        46315,
+        null,
+        'Galaxy',
+        'Aaron Chang',
+        'LS-107OR',
+        null,
+        2,
+        39,
+        39,
+        'long specification that is not the model',
+        'C001',
+        '',
+        'LS-107',
+      ],
+      [
+        4,
+        'SI26100869',
+        'Advantage Digital Ltd.',
+        '2026-10-20',
+        17899,
+        'Galaxy',
+        'Aaron Chang',
+        'BR9-SKU',
+        'name',
+        50,
+        50,
+        50,
+        'another long specification',
+        'C002',
+        '',
+        'BR9',
+      ],
+    ])
+
+    expect(incoming.map((row) => row.date)).toEqual(['2026-10-20', '2026-10-20', '2026-10-20'])
+    expect(incoming.map((row) => isoWeekKey(row.date))).toEqual(['2026-W43', '2026-W43', '2026-W43'])
+    expect(incoming.map((row) => row.totalAmount)).toEqual([88, 39, 50])
+    expect(incoming.map((row) => row.productModel)).toEqual(['KS-726', 'LS-107', 'BR9'])
+    expect(incoming.map((row) => row.invoice)).toEqual(['GAL26-10-20-001', 'GAL26-10-20-001', 'SI26100869'])
+    expect(incoming.map((row) => row.sku)).toEqual(['KS-726DG', 'LS-107OR', 'BR9-SKU'])
+
+    const seed = [
+      lineItem({
+        invoice: 'SEED-W42',
+        date: '2026-10-12',
+        totalAmount: 100,
+        customer: 'ADDL',
+      }),
+    ]
+    const merged = mergeImportedItems(seed, incoming, 'merge')
+    expect(merged.added).toBe(3)
+    expect(merged.replaced).toBe(0)
+    expect(listWeekKeys(merged.lineItems)).toContain('2026-W43')
+    expect(listWeekKeys(merged.lineItems)).toContain('2026-W42')
+
+    const wonderland = merged.lineItems.filter((row) => row.invoice === 'GAL26-10-20-001')
+    expect(wonderland.map((row) => row.customer)).toEqual(['Wonderland', 'Wonderland'])
+    expect(merged.lineItems.find((row) => row.invoice === 'SI26100869')?.customer).toBe('ADDL')
+
+    const kept = reconcileFilters(
+      { weekKey: '2026-W42', salesperson: 'all', department: 'all', query: '' },
+      merged.lineItems,
+    )
+    expect(kept.weekKey).toBe('2026-W42')
+    expect(listWeekKeys(merged.lineItems)).toContain('2026-W43')
+
+    // Same inputs as Top product models (qty): this week’s lines, model or SKU, quantity.
+    const rank = (weekKey: string, salesperson = 'all') => {
+      const week = filterItems(merged.lineItems, {
+        weekKey,
+        salesperson,
+        department: 'all',
+        query: '',
+      })
+      return [...groupBy(week, (row) => row.productModel || row.sku)]
+        .sort((a, b) => b.quantity - a.quantity || b.revenue - a.revenue)
+        .slice(0, 10)
+        .map((row) => ({ name: row.name, qty: Math.round(row.quantity) }))
+    }
+
+    expect(rank('2026-W43')).toEqual([
+      { name: 'BR9', qty: 50 },
+      { name: 'LS-107', qty: 2 },
+      { name: 'KS-726', qty: 1 },
+    ])
+    expect(rank('2026-W43', 'Aaron Chang')).toEqual(rank('2026-W43'))
+    expect(rank('2026-W42')).toEqual([{ name: 'SEED-SKU', qty: 1 }])
+    expect(filterItems(merged.lineItems, { weekKey: '2026-W42', salesperson: 'all', department: 'all', query: '' }).some((row) => row.date === '2026-10-20')).toBe(false)
+  })
+
+  it('still uses Amount when the sheet has no tax-inclusive column', () => {
+    const rows = ingestSheet([
+      ['Date', 'Amount', 'Salesperson'],
+      ['2026-10-20', 120, 'Aaron Chang'],
+    ])
+    expect(rows[0]?.date).toBe('2026-10-20')
+    expect(rows[0]?.totalAmount).toBe(120)
+    expect(isoWeekKey(rows[0]?.date ?? '')).toBe('2026-W43')
+  })
+
+  it('prefers 价税合计 over a repeated 金额 document total', () => {
+    const rows = ingestSheet([
+      ['单据日期', '金额', '价税合计', '销售员', '规格型号', '产品型号'],
+      ['2026-10-08', 9999, 640, 'Aaron Chang', 'long spec text', 'KS-726'],
+    ])
+    expect(rows[0]?.totalAmount).toBe(640)
+    expect(rows[0]?.productModel).toBe('KS-726')
+  })
+
+  it('keeps 金额 and Specification when they are the only amount and model columns', () => {
+    const rows = ingestSheet([
+      ['单据日期', '金额', 'Specification'],
+      ['2026-10-08', 640, 'KS-1'],
+    ])
+    expect(rows[0]?.totalAmount).toBe(640)
+    expect(rows[0]?.productModel).toBe('KS-1')
   })
 })
