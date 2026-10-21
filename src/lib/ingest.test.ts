@@ -7,7 +7,7 @@
  * Replace swaps the working set for the ingested rows and does not rematch.
  */
 import { describe, expect, it } from 'vitest'
-import { groupBy, isoWeekKey, listWeekKeys, sumRevenue } from './aggregates'
+import { filterItems, groupBy, isoWeekKey, listWeekKeys, sumRevenue } from './aggregates'
 import { reconcileFilters } from './filters'
 import { ingestRecords, mergeImportedItems, recordsFromMatrix } from './ingest'
 import { WGAL_PARTNER_ALIASES } from './partnerAliases'
@@ -310,6 +310,29 @@ describe('English Kingdee List Data export', () => {
     )
     expect(kept.weekKey).toBe('2026-W42')
     expect(listWeekKeys(merged.lineItems)).toContain('2026-W43')
+
+    // Same inputs as Top product models (qty): this week’s lines, model or SKU, quantity.
+    const rank = (weekKey: string, salesperson = 'all') => {
+      const week = filterItems(merged.lineItems, {
+        weekKey,
+        salesperson,
+        department: 'all',
+        query: '',
+      })
+      return [...groupBy(week, (row) => row.productModel || row.sku)]
+        .sort((a, b) => b.quantity - a.quantity || b.revenue - a.revenue)
+        .slice(0, 10)
+        .map((row) => ({ name: row.name, qty: Math.round(row.quantity) }))
+    }
+
+    expect(rank('2026-W43')).toEqual([
+      { name: 'BR9', qty: 50 },
+      { name: 'LS-107', qty: 2 },
+      { name: 'KS-726', qty: 1 },
+    ])
+    expect(rank('2026-W43', 'Aaron Chang')).toEqual(rank('2026-W43'))
+    expect(rank('2026-W42')).toEqual([{ name: 'SEED-SKU', qty: 1 }])
+    expect(filterItems(merged.lineItems, { weekKey: '2026-W42', salesperson: 'all', department: 'all', query: '' }).some((row) => row.date === '2026-10-20')).toBe(false)
   })
 
   it('still uses Amount when the sheet has no tax-inclusive column', () => {
