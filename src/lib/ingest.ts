@@ -36,65 +36,95 @@ type Field =
   | 'customerCode'
   | 'source'
 
-const FIELD_ALIASES: Record<Field, string[]> = {
+/**
+ * Alias groups, best first. An earlier group wins over a later one for the same
+ * field. Inside a group the longer header wins, so Customer Name beats Customer.
+ *
+ * Kingdee’s English “List Data” export puts the document total in Amount and the
+ * line sell-out in Tax-Inclusive Amount (价税合计). Specification is a description;
+ * 产品型号 is the model code charts use.
+ */
+const FIELD_ALIAS_GROUPS: Record<Field, readonly (readonly string[])[]> = {
   invoice: [
-    'invoice',
-    'invoiceno',
-    'invoicenumber',
-    'billno',
-    'billnumber',
-    'documentno',
-    '单据编号',
-    '发票号',
-    '发票编号',
-    '单号',
-    '销售单号',
+    [
+      'invoice',
+      'invoiceno',
+      'invoicenumber',
+      'billno',
+      'billnumber',
+      'documentno',
+      'documentnumber',
+      '单据编号',
+      '发票号',
+      '发票编号',
+      '单号',
+      '销售单号',
+    ],
   ],
-  tradingPartner: ['tradingpartner', '往来单位', '交易对象'],
-  customer: ['customer', 'customername', 'client', '客户', '客户名称', '客户名'],
-  date: ['date', 'invoicedate', 'billdate', 'bizdate', 'orderdate', '日期', '业务日期', '单据日期', '开票日期', '销售日期'],
-  department: ['department', 'salesdepartment', 'dept', '部门', '销售部门'],
+  tradingPartner: [['tradingpartner', '往来单位', '交易对象']],
+  customer: [['customer', 'customername', 'client', '客户', '客户名称', '客户名']],
+  date: [
+    [
+      'date',
+      'invoicedate',
+      'billdate',
+      'bizdate',
+      'businessdate',
+      'orderdate',
+      '日期',
+      '业务日期',
+      '单据日期',
+      '开票日期',
+      '销售日期',
+    ],
+  ],
+  department: [['department', 'salesdepartment', 'dept', '部门', '销售部门']],
   salesperson: [
-    'salesperson',
-    'salesman',
-    'salesrep',
-    'salesrepresentative',
-    'seller',
-    '销售员',
-    '业务员',
-    '销售人员',
-    '业务人员',
+    [
+      'salesperson',
+      'salesman',
+      'salesrep',
+      'salesrepresentative',
+      'seller',
+      '销售员',
+      '业务员',
+      '销售人员',
+      '业务人员',
+    ],
   ],
-  sku: ['sku', 'itemcode', 'materialcode', 'productcode', '物料编码', '商品编码', '货品编码', '产品编码'],
-  productModel: ['productmodel', 'model', 'spec', 'specification', '产品型号', '规格型号', '型号'],
-  category: ['category', 'name', '类别', '分类', '产品类别'],
-  quantity: ['quantity', 'qty', '数量', '实发数量', '销售数量'],
-  unitPrice: ['unitprice', '单价', '含税单价', '销售单价'],
+  sku: [['sku', 'itemcode', 'materialcode', 'productcode', '物料编码', '商品编码', '货品编码', '产品编码']],
+  productModel: [
+    ['productmodel', '产品型号'],
+    ['model', '型号', '规格型号'],
+    ['spec', 'specification'],
+  ],
+  category: [['category', 'name', '类别', '分类', '产品类别']],
+  quantity: [['quantity', 'qty', '数量', '实发数量', '销售数量']],
+  unitPrice: [['unitprice', '单价', '含税单价', '销售单价']],
   totalAmount: [
-    'totalamount',
-    'amount',
-    'totalsales',
-    'salesamount',
-    'revenue',
-    'linetotal',
-    '金额',
-    '价税合计',
-    '销售金额',
-    '总金额',
-    '合计金额',
+    ['taxinclusiveamount', '价税合计', '含税金额', '含税合计'],
+    ['totalamount', 'linetotal', 'salesamount', 'totalsales', 'revenue', '销售金额', '总金额', '合计金额'],
+    ['amount', '金额'],
   ],
-  productName: ['productname', 'itemname', 'materialname', '物料名称', '商品名称', '产品名称', '货品名称'],
-  customerCode: ['customercode', '客户编码', '客户代码'],
-  source: ['source'],
+  productName: [['productname', 'itemname', 'materialname', '物料名称', '商品名称', '产品名称', '货品名称']],
+  customerCode: [['customercode', '客户编码', '客户代码']],
+  source: [['source']],
 }
 
-const HEADER_TO_FIELD = new Map<string, Field>()
-for (const [field, aliases] of Object.entries(FIELD_ALIASES) as [Field, string[]][]) {
-  for (const alias of aliases) HEADER_TO_FIELD.set(normHeader(alias), field)
+type HeaderMatch = { field: Field; priority: number }
+
+const HEADER_MATCH = new Map<string, HeaderMatch>()
+for (const [field, groups] of Object.entries(FIELD_ALIAS_GROUPS) as [Field, readonly (readonly string[])[]][]) {
+  groups.forEach((aliases, priority) => {
+    for (const alias of aliases) {
+      const key = normHeader(alias)
+      if (!HEADER_MATCH.has(key)) HEADER_MATCH.set(key, { field, priority })
+    }
+  })
 }
 
 export const IMPORT_COLUMN_HINT =
-  'Expected columns: Date (日期 / 单据日期 / 业务日期) and Total Amount (金额 / 价税合计 / 销售金额), or Quantity × Unit Price. Salesperson (销售员 / 业务员) drives the sell-out pie. Optional: Invoice (单据编号), Customer (客户 / 客户名称; 往来单位 is used when that is empty), Department (销售部门), SKU (物料编码), product model (产品型号 / 规格型号). Ambiguous numeric dates are read as day/month/year.'
+  'Expected columns: Date (Business Date / 日期 / 单据日期 / 业务日期) and Tax-Inclusive Amount (价税合计) or Total Amount (金额 / 销售金额), or Quantity × Unit Price. When Amount and Tax-Inclusive Amount are both present, the tax-inclusive figure is the line sell-out. Salesperson (销售员 / 业务员) drives the sell-out pie. Optional: Invoice (Document Number / 单据编号), Customer (客户 / 客户名称; 往来单位 is used when that is empty), Department (销售部门), SKU (物料编码), product model (产品型号 / 规格型号; Specification is used only when no model column is present). Ambiguous numeric dates are read as day/month/year.'
 
 export function normHeader(value: string): string {
   return value
@@ -106,10 +136,18 @@ export function normHeader(value: string): string {
 }
 
 export function fieldForHeader(header: string): Field | null {
-  return HEADER_TO_FIELD.get(normHeader(header)) ?? null
+  return HEADER_MATCH.get(normHeader(header))?.field ?? null
 }
 
-type Column = { field: Field; index: number; specificity: number }
+type Rank = { priority: number; specificity: number }
+
+function betterRank(next: Rank, prev: Rank | undefined): boolean {
+  if (!prev) return true
+  if (next.priority !== prev.priority) return next.priority < prev.priority
+  return next.specificity > prev.specificity
+}
+
+type Column = Rank & { field: Field; index: number }
 
 function columnsFromHeader(headers: unknown[]): Column[] {
   const chosen = new Map<Field, Column>()
@@ -117,13 +155,16 @@ function columnsFromHeader(headers: unknown[]): Column[] {
     if (header == null) return
     const label = String(header).trim()
     if (!label) return
-    const field = fieldForHeader(label)
-    if (!field) return
-    const specificity = normHeader(label).length
-    const prev = chosen.get(field)
-    if (!prev || specificity > prev.specificity) {
-      chosen.set(field, { field, index, specificity })
+    const match = HEADER_MATCH.get(normHeader(label))
+    if (!match) return
+    const next: Column = {
+      field: match.field,
+      index,
+      priority: match.priority,
+      specificity: normHeader(label).length,
     }
+    const prev = chosen.get(match.field)
+    if (betterRank(next, prev)) chosen.set(match.field, next)
   })
   return [...chosen.values()].sort((a, b) => a.index - b.index)
 }
@@ -164,12 +205,12 @@ export function recordsFromMatrix(rows: unknown[][]): {
       .filter(Boolean)
       .slice(0, 8)
     throw new Error(
-      `No date column found${preview.length ? ` (first row: ${preview.join(', ')})` : ''}. Expected Date, 日期, 单据日期, or 业务日期.`,
+      `No date column found${preview.length ? ` (first row: ${preview.join(', ')})` : ''}. Expected Date, Business Date, 日期, 单据日期, or 业务日期.`,
     )
   }
   if (!fields.includes('totalAmount') && !(fields.includes('quantity') && fields.includes('unitPrice'))) {
     throw new Error(
-      `No amount column found (recognized: ${fields.join(', ')}). Expected Total Amount, 金额, 价税合计, or both Quantity and Unit Price.`,
+      `No amount column found (recognized: ${fields.join(', ')}). Expected Tax-Inclusive Amount, Total Amount, 金额, 价税合计, or both Quantity and Unit Price.`,
     )
   }
 
@@ -194,15 +235,14 @@ export function recordsFromMatrix(rows: unknown[][]): {
 
 export function normalizeRecordKeys(raw: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {}
-  const spec = new Map<Field, number>()
+  const spec = new Map<Field, Rank>()
   for (const [key, value] of Object.entries(raw)) {
-    const field = fieldForHeader(key)
-    if (!field) continue
-    const specificity = normHeader(key).length
-    const prev = spec.get(field)
-    if (prev != null && specificity <= prev) continue
-    spec.set(field, specificity)
-    out[field] = value
+    const match = HEADER_MATCH.get(normHeader(key))
+    if (!match) continue
+    const next: Rank = { priority: match.priority, specificity: normHeader(key).length }
+    if (!betterRank(next, spec.get(match.field))) continue
+    spec.set(match.field, next)
+    out[match.field] = value
   }
   return out
 }
