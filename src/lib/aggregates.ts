@@ -48,6 +48,39 @@ export function weekDateRange(weekKey: string): { start: string; end: string } |
   }
 }
 
+function monthEndIso(monthKey: string): string {
+  const [year, month] = monthKey.split('-').map(Number)
+  const last = new Date(Date.UTC(year, month, 0)).getUTCDate()
+  return `${monthKey}-${String(last).padStart(2, '0')}`
+}
+
+export type ReviewWindow = {
+  range: { start: string; end: string }
+  /** Month of the week's Thursday. A Mon–Sun week that ends on the 1st stays in the month that holds Mon–Thu. */
+  monthKey: string
+  /** Week end, clamped to the last day of `monthKey`. */
+  throughDate: string
+}
+
+/**
+ * Review month and MTD cutoff for a week.
+ * ISO weeks are named by Thursday, so 2026-W44 (10-26 → 11-01) is still October.
+ * Using Sunday 11-01 as the month made MTD and the monthly charts look at an empty November.
+ */
+export function reviewWindow(weekKey: string): ReviewWindow | null {
+  const range = weekDateRange(weekKey)
+  if (!range) return null
+  const thursday = new Date(range.start + 'T12:00:00Z')
+  thursday.setUTCDate(thursday.getUTCDate() + 3)
+  const monthKey = thursday.toISOString().slice(0, 7)
+  const monthLast = monthEndIso(monthKey)
+  return {
+    range,
+    monthKey,
+    throughDate: range.end > monthLast ? monthLast : range.end,
+  }
+}
+
 /** Shift a calendar date by N months, clamping day (e.g. Mar 31 → Feb 28). */
 export function addMonthsClamped(isoDate: string, deltaMonths: number): string {
   const d = new Date(isoDate + 'T12:00:00Z')
@@ -283,16 +316,15 @@ export function filterByDateRange(
   })
 }
 
-/** Month-to-date items in the same calendar month as the week's Thursday (or end). */
+/** Month-to-date items in the review month (the week's Thursday) through `reviewWindow().throughDate`. */
 export function filterMtdThroughWeek(items: LineItem[], f: Filters, weekKey: string): LineItem[] {
-  const range = weekDateRange(weekKey)
-  if (!range) return []
-  const monthKey = monthKeyFromDate(range.end)
+  const window = reviewWindow(weekKey)
+  if (!window) return []
   const q = f.query.trim().toLowerCase()
   return items.filter((row) => {
     if (!row.date) return false
-    if (monthKeyFromDate(row.date) !== monthKey) return false
-    if (row.date > range.end) return false
+    if (monthKeyFromDate(row.date) !== window.monthKey) return false
+    if (row.date > window.throughDate) return false
     if (f.salesperson !== 'all' && row.salesperson !== f.salesperson) return false
     if (f.department !== 'all' && row.department !== f.department) return false
     if (!q) return true

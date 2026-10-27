@@ -1,7 +1,8 @@
 /// <reference types="node" />
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { monthDaily, monthKeyFromDate } from './aggregates'
+import { filterMtdThroughWeek, monthDaily, monthKeyFromDate, reviewWindow, sumRevenue } from './aggregates'
+import { mtdWorkingDays } from './hkHolidays'
 import { AMBER, CLAY, CREAM, SAGE, TAUPE, customerWeekFill } from './palette'
 import {
   customerWorkingDayMom,
@@ -230,5 +231,64 @@ describe('customer working-day MoM and model reps', () => {
     const modelQty = models.bars.reduce((sum, bar) => sum + bar.total, 0)
     const earlierQty = modelsEarlier.bars.reduce((sum, bar) => sum + bar.total, 0)
     expect(earlierQty).toBeLessThan(modelQty)
+  })
+})
+
+describe('review week that ends in the next month', () => {
+  const filters = { weekKey: '2026-W44', salesperson: 'all', department: 'all', query: '' }
+
+  it('keeps 2026-W44 in October, with a non-zero MTD through the month end', () => {
+    const window = reviewWindow('2026-W44')
+    expect(window).toMatchObject({
+      range: { start: '2026-10-26', end: '2026-11-01' },
+      monthKey: '2026-10',
+      throughDate: '2026-10-31',
+    })
+    expect(reviewWindow('2026-W43')).toMatchObject({
+      monthKey: '2026-10',
+      throughDate: '2026-10-25',
+    })
+    expect(reviewWindow('2026-W42')).toMatchObject({
+      monthKey: '2026-10',
+      throughDate: '2026-10-18',
+    })
+
+    const days = mtdWorkingDays('2026-10', window!.throughDate)
+    expect(days.elapsed).toBe(20)
+    expect(days.total).toBe(20)
+    expect(mtdWorkingDays('2026-11', '2026-11-01').elapsed).toBe(0)
+
+    const items = [
+      line('2026-10-13', 400, { invoice: 'early' }),
+      line('2026-10-20', 800, { invoice: 'mid', customer: 'Vision' }),
+      line('2026-10-27', 1600, { invoice: 'late', customer: 'Wonderland' }),
+      line('2026-11-01', 50, { invoice: 'sunday', customer: 'ADDL' }),
+    ]
+    const throughW44 = filterMtdThroughWeek(items, filters, '2026-W44')
+    expect(throughW44.map((row) => row.invoice)).toEqual(['early', 'mid', 'late'])
+    expect(sumRevenue(throughW44)).toBe(2800)
+
+    const throughW43 = filterMtdThroughWeek(items, { ...filters, weekKey: '2026-W43' }, '2026-W43')
+    expect(throughW43.map((row) => row.invoice)).toEqual(['early', 'mid'])
+    expect(sumRevenue(throughW43)).toBe(1200)
+    expect(mtdWorkingDays('2026-10', '2026-10-25').elapsed).toBe(15)
+
+    const october = customerWorkingDayMom(throughW44, '2026-10', '2026-10-31')
+    expect(october.bars.map((bar) => bar.name)).toEqual(['Wonderland', 'Vision', 'ADDL'])
+    expect(october.span.workingDayCount).toBe(20)
+    expect(modelRepStacks(throughW44, '2026-10', '2026-10-31').bars.length).toBeGreaterThan(0)
+  })
+
+  it('leaves the seeded W42 October MTD on 11 working days', () => {
+    const payload = JSON.parse(readFileSync('public/data/sales-line-items.json', 'utf8')) as SalesPayload
+    const window = reviewWindow('2026-W42')
+    expect(window?.throughDate).toBe('2026-10-18')
+    const rows = filterMtdThroughWeek(
+      payload.lineItems,
+      { weekKey: '2026-W42', salesperson: 'all', department: 'all', query: '' },
+      '2026-W42',
+    )
+    expect(mtdWorkingDays('2026-10', window!.throughDate).elapsed).toBe(11)
+    expect(Math.round(sumRevenue(rows))).toBe(725442)
   })
 })

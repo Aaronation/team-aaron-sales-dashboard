@@ -32,7 +32,7 @@ import {
   uniqueCustomers,
   uniqueInvoices,
   uniqueSorted,
-  weekDateRange,
+  reviewWindow,
   weekLabel,
 } from './lib/aggregates'
 import { customerWorkingDayMom, modelRepStacks, monthDailyComparison } from './lib/chartSeries'
@@ -148,11 +148,11 @@ export default function App() {
     [payload],
   )
 
-  const selectedRange =
-    filters && filters.weekKey !== 'all' ? weekDateRange(filters.weekKey) : null
+  const review = filters && filters.weekKey !== 'all' ? reviewWindow(filters.weekKey) : null
+  const selectedRange = review?.range ?? null
   const priorRange = selectedRange ? samePeriodLastMonth(selectedRange) : null
-  const workingDays = selectedRange
-    ? mtdWorkingDays(monthKeyFromDate(selectedRange.end), selectedRange.end)
+  const workingDays = review
+    ? mtdWorkingDays(review.monthKey, review.throughDate)
     : { elapsed: 0, total: 0, holidaysLoaded: false }
 
   const thisWeek = useMemo(() => {
@@ -195,15 +195,12 @@ export default function App() {
   }, [payload, filters])
   const months = useMemo(() => monthlyTotals(monthScoped), [monthScoped])
 
-  const shareMonthKey =
-    filters && filters.weekKey !== 'all' && selectedRange
-      ? monthKeyFromDate(selectedRange.end)
-      : null
+  const shareMonthKey = review?.monthKey ?? null
   const dayComparison = useMemo(
     () => (shareMonthKey ? monthDailyComparison(monthScoped, shareMonthKey) : null),
     [monthScoped, shareMonthKey],
   )
-  const mtdThrough = selectedRange?.end ?? null
+  const mtdThrough = review?.throughDate ?? null
   const customerMom = useMemo(
     () =>
       shareMonthKey && mtdThrough
@@ -224,8 +221,7 @@ export default function App() {
   )
   const shareRows = useMemo(() => {
     if (!payload || !filters) return []
-    const range = filters.weekKey === 'all' ? null : weekDateRange(filters.weekKey)
-    const monthKey = range ? monthKeyFromDate(range.end) : null
+    const monthKey = filters.weekKey === 'all' ? null : reviewWindow(filters.weekKey)?.monthKey
     const base = filterIgnoringWeek(payload.lineItems, {
       weekKey: filters.weekKey,
       salesperson: 'all',
@@ -337,15 +333,14 @@ export default function App() {
   const revenue = sumRevenue(thisWeek)
   const prevRevenue = sumRevenue(priorPeriod)
   const delta = pctDelta(revenue, prevRevenue)
-  const range = selectedRange
-  const monthKey = range ? monthKeyFromDate(range.end) : '2026-10'
+  const monthKey = review?.monthKey ?? '2026-10'
   const monthTarget = teamTargetForMonth(monthKey, payload.meta.targets)
   const pacedTarget = reviewTarget(filters.salesperson, monthKey, payload.meta.targets)
   const mtdRevenue = sumRevenue(mtd)
   const monthForecast = selectedRange
     ? forecastForReview({
         monthKey,
-        throughDate: selectedRange.end,
+        throughDate: review?.throughDate ?? selectedRange.end,
         mtdRevenue,
         target: pacedTarget.amount,
       })
@@ -424,14 +419,14 @@ export default function App() {
         reviewMonthLabel={formatMonthLabel(monthKey)}
         mtdWorkingDays={workingDays.elapsed}
         monthWorkingDays={workingDays.total}
-        workingDaysThrough={selectedRange ? selectedRange.end.slice(5) : '—'}
+        workingDaysThrough={review ? review.throughDate.slice(5) : '—'}
         holidaysLoaded={workingDays.holidaysLoaded}
       />
 
       {selectedRange && monthForecast ? (
         <ForecastPanel
           monthLabel={formatMonthLabel(monthKey)}
-          throughLabel={selectedRange.end.slice(5)}
+          throughLabel={review ? review.throughDate.slice(5) : selectedRange.end.slice(5)}
           targetLabel={pacedTarget.label}
           scopeNote={forecastScopeNote(filters)}
           result={monthForecast}
