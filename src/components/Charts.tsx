@@ -26,7 +26,7 @@ function CustomerTick({
   payload?: { value?: string }
 }) {
   return (
-    <text x={x} y={y} dy={4} textAnchor="end" fill={INK} fontSize={11}>
+    <text x={x} y={y} dy={4} textAnchor="end" fill={INK} fontSize={12}>
       {payload?.value}
     </text>
   )
@@ -95,9 +95,9 @@ export function Charts({
               dataKey="priorPeriod"
               name="Same period last month"
               fill={SAGE}
-              radius={[4, 4, 0, 0]}
+              radius={[6, 6, 0, 0]}
             />
-            <Bar dataKey="thisPeriod" name="This week" fill={OLIVE} radius={[4, 4, 0, 0]} />
+            <Bar dataKey="thisPeriod" name="This week" fill={OLIVE} radius={[6, 6, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </figure>
@@ -134,7 +134,7 @@ export function Charts({
                 return `${d.fullName ?? ''} · ${delta}`
               }}
             />
-            <Bar dataKey="revenue" fill={customerBarColor} radius={[0, 4, 4, 0]} />
+            <Bar dataKey="revenue" fill={customerBarColor} radius={[0, 6, 6, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </figure>
@@ -154,7 +154,7 @@ export function Charts({
             />
             <YAxis />
             <Tooltip formatter={(value) => [`${Number(value).toLocaleString()} units`, 'Qty']} />
-            <Bar dataKey="qty" name="Qty" fill={skuBarColor} radius={[4, 4, 0, 0]} />
+            <Bar dataKey="qty" name="Qty" fill={skuBarColor} radius={[6, 6, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </figure>

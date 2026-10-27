@@ -8,15 +8,18 @@ export type LoadedImport = IngestResult & { label: string }
 
 const HEADER_PROBES = [
   'date',
+  'business date',
   '日期',
   '金额',
   '价税合计',
+  'tax-inclusive',
   'salesperson',
   '销售员',
   'total amount',
   'quantity',
   '数量',
   'invoice',
+  'document number',
   '单据编号',
 ]
 

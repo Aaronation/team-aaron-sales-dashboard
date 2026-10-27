@@ -8,7 +8,9 @@ Phase 2 adds three things on top of that weekly review:
 
 - **Monthly sales** — each calendar month’s total sell-out (bar chart and summary table). The review week does not clip the month. The highlighted row is the month of the selected week.
 - **Sell-out pie** — each salesperson’s share of that month’s sell-out, as a percentage. Sell-out is the line `totalAmount` (there is no separate sell-out column in the seed). The rep filter does not hide other slices.
-- **Hand import** — upload a CSV or Excel export (or the dashboard JSON) to update the in-memory data. KingdeeAI auto-sync is out of scope. `ingestRecords()` in `src/lib/ingest.ts` is the shared mapper a future sync should call.
+- **Hand import** — upload a CSV or Excel export (or the dashboard JSON) to update the working set. KingdeeAI auto-sync is out of scope. `ingestRecords()` in `src/lib/ingest.ts` is the shared mapper a future sync should call.
+
+Phase 3 saves that working set in the browser and adds **Targets and forecast** (monthly target vs MTD, on track / behind, and a working-day run-rate). Kingdee auto-sync stays deferred.
 
 ## Run locally
 
@@ -42,9 +44,11 @@ python3 scripts/extract-xlsx.py \
 2. Use **Load sample export** (merge). That fetches `public/data/sample-kingdee-import.csv`, a small Kingdee-style file with Chinese headers.
 3. November 2026 appears on the monthly chart at **HK$30,000**. The weekly review stays on the current week until you change it.
 4. Pick a November review week (2026-W45 or 2026-W46). The sell-out pie for Nov 2026 is Aaron Chang 50%, Kelvin Lai 30%, Kenny Ma 10%, Riley Cho 10%.
-5. **Replace all** with the same file leaves only those five rows. **Reset to seed** restores the bundled JSON.
+5. Refresh the page. November, the import note, and the review week you picked are still there. The footer still names `sample-kingdee-import.csv`.
+6. With review week `2026-W45`, **Targets and forecast** shows Nov 2026 MTD `HK$24,000`, pace **Behind**, and forecast `HK$100,800`.
+7. **Replace all** with the same file leaves only those five rows. **Reset to seed** clears the browser save and restores the bundled JSON. A second refresh stays on the seed.
 
-You can also upload your own `.csv`, `.xlsx`, or dashboard `.json`. Legacy `.xls` is not accepted — export `.xlsx` or CSV from Kingdee. The import lasts for the browser session only.
+You can also upload your own `.csv`, `.xlsx`, or dashboard `.json`. Legacy `.xls` is not accepted — export `.xlsx` or CSV from Kingdee. Merge and Replace are saved in this browser (IndexedDB). Refresh keeps that working set, including the review week, until **Reset to seed**. The seed file on disk is not rewritten.
 
 Ambiguous numeric dates (`06/11/2026`) are read as day/month/year.
 
@@ -67,6 +71,17 @@ Ambiguous numeric dates (`06/11/2026`) are read as day/month/year.
 A title block above the header row is skipped. Rows labeled 合计 / Total are skipped. **Merge** adds new lines and replaces a line when invoice, SKU, date, quantity, amount, and customer all match. **Replace** swaps the working set and keeps the team targets from the seed.
 
 CSV may be UTF-8 or GB18030. Excel workbooks use the sheet named `Data` when several sheets match.
+
+## Targets and forecast
+
+Under the weekly scorecard, **Targets and forecast** shows the review month:
+
+- **Team target** for the month (or that rep’s split when a salesperson is selected).
+- **MTD sell-out** through the end of the review week.
+- **Pace** — On track when MTD is at or above a straight line from zero to the target across Hong Kong working days; Behind when it is below. Weekends and gazetted HK holidays are excluded.
+- **Forecast** — MTD divided by elapsed working days, times the working days in the month.
+
+October 2026 on the seeded week `2026-W42` is behind: MTD `HK$725,442` against a straight-line `HK$1,815,000`, forecast `HK$1,318,985`.
 
 ## Stack
 

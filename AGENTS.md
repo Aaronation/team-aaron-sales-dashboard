@@ -1,6 +1,6 @@
 # Agent notes
 
-Phase 1 is the weekly manager review (week picker, same calendar dates last month, rep / customer / SKU review, line detail, HKD). Phase 2 adds monthly totals, the sell-out pie, and hand import. Later phases keep both.
+Phase 1 is the weekly manager review (week picker, same calendar dates last month, rep / customer / SKU review, line detail, HKD). Phase 2 adds monthly totals, the sell-out pie, and hand import. Phase 3 keeps that working set in the browser (IndexedDB for the lines, localStorage for the review filters) and adds monthly target vs MTD, pace, and a working-day forecast. Later phases keep all of this. Kingdee auto-sync stays deferred.
 
 ## Standing rules
 

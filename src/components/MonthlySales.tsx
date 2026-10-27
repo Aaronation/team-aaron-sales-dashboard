@@ -19,11 +19,96 @@ import {
   shortName,
   tickLabel,
   type MonthTotal,
-  type NamedTotal,
   type RepAchievement,
   type SellOutShare,
 } from '../lib/aggregates'
-import { AMBER, GRID, INK, LIGHT_SLICE_FILLS, OLIVE, TAUPE, sliceColorAt } from '../lib/palette'
+import {
+  orderSeriesLikeShares,
+  segmentKey,
+  type CustomerMom,
+  type MonthDayComparison,
+  type StackBar,
+  type StackSeries,
+} from '../lib/chartSeries'
+import { AMBER, GRID, INK, LIGHT_SLICE_FILLS, OLIVE, TAUPE, customerBarColor, customerWeekFill, sliceColorAt } from '../lib/palette'
+
+function SeriesLegend({ items }: { items: { label: string; color: string }[] }) {
+  return (
+    <ul className="series-legend">
+      {items.map((item, index) => (
+        <li key={`${item.label}-${index}`}>
+          <span className="series-legend__swatch" style={{ background: item.color }} />
+          {item.label}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function DayTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean
+  payload?: { payload?: { index?: number; label?: string; revenue?: number; priorLabel?: string | null; priorRevenue?: number | null } }[]
+}) {
+  const row = payload?.[0]?.payload
+  if (!active || !row) return null
+  return (
+    <div className="chart-tip">
+      <p className="chart-tip__title">
+        Day {row.index} · {row.label}
+      </p>
+      <p>This month · {formatMoney(row.revenue ?? 0)}</p>
+      <p>
+        Last month{row.priorLabel ? ` · ${row.priorLabel}` : ''} ·{' '}
+        {row.priorRevenue == null ? '—' : formatMoney(row.priorRevenue)}
+      </p>
+    </div>
+  )
+}
+
+function MomTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean
+  payload?: { payload?: { fullName?: string; current?: number; prior?: number | null } }[]
+}) {
+  const row = payload?.[0]?.payload
+  if (!active || !row) return null
+  return (
+    <div className="chart-tip">
+      <p className="chart-tip__title">{row.fullName}</p>
+      <p>This period · {formatMoney(row.current ?? 0)}</p>
+      {row.prior == null ? null : <p>Last month · {formatMoney(row.prior)}</p>}
+    </div>
+  )
+}
+
+function StackTooltip({
+  active,
+  payload,
+  format,
+}: {
+  active?: boolean
+  payload?: { name?: string; value?: number; color?: string; payload?: { fullName?: string } }[]
+  format: (value: number) => string
+}) {
+  if (!active || !payload?.length) return null
+  const rows = payload.filter((row) => row.value != null && Number(row.value) !== 0)
+  const title = payload[0]?.payload?.fullName
+  return (
+    <div className="chart-tip">
+      {title ? <p className="chart-tip__title">{title}</p> : null}
+      {rows.map((row) => (
+        <p key={String(row.name)}>
+          {row.name} · {format(Number(row.value))}
+        </p>
+      ))}
+    </div>
+  )
+}
 
 function CustomerTick({
   x = 0,
@@ -49,12 +134,11 @@ type Props = {
   scopeNote: string
   showTarget: boolean
   repRows: RepAchievement[]
-  monthCustomers: NamedTotal[]
-  monthDays: { date: string; revenue: number }[]
-  monthModels: NamedTotal[]
+  dayComparison: MonthDayComparison | null
+  customerMom: CustomerMom | null
+  modelStacks: { series: StackSeries[]; bars: StackBar[] }
+  mtdThroughLabel: string | null
   salesperson: string
-  customerBarColor: string
-  modelBarColor: string
 }
 
 function formatAchieve(achieve: number | null): string {
@@ -70,12 +154,11 @@ export function MonthlySales({
   scopeNote,
   showTarget,
   repRows,
-  monthCustomers,
-  monthDays,
-  monthModels,
+  dayComparison,
+  customerMom,
+  modelStacks,
+  mtdThroughLabel,
   salesperson,
-  customerBarColor,
-  modelBarColor,
 }: Props) {
   const chartRows = months.map((month) => ({
     ...month,
@@ -99,22 +182,33 @@ export function MonthlySales({
   const modelTitle = repLabel
     ? `${repLabel} top product models · ${shareLabel}`
     : `Top product models · ${shareLabel}`
-  const topCustomers = monthCustomers.slice(0, 10).map((customer) => ({
+  const topCustomers = (customerMom?.bars ?? []).map((customer) => ({
     name: tickLabel(customer.name, 24),
     fullName: customer.name,
-    revenue: Math.round(customer.revenue),
+    current: Math.round(customer.current),
+    prior: customer.prior == null ? null : Math.round(customer.prior),
+    ...Object.fromEntries(
+      (customerMom?.weeks ?? []).map((week) => [
+        segmentKey('week', week.key),
+        Math.round(customer.weeks[week.key] ?? 0),
+      ]),
+    ),
   }))
-  const topModels = [...monthModels]
-    .sort((a, b) => b.quantity - a.quantity || b.revenue - a.revenue)
-    .slice(0, 10)
-    .map((model) => ({
-      name: model.name,
-      qty: Math.round(model.quantity),
-      revenue: Math.round(model.revenue),
-    }))
-  const dayRows = monthDays.map((day) => ({
-    date: day.date.slice(5),
+  const modelSeries = orderSeriesLikeShares(modelStacks.series, shares)
+  const topModels = modelStacks.bars.map((model) => ({
+    name: model.name,
+    fullName: model.name,
+    ...Object.fromEntries(
+      modelSeries.map((series) => [
+        segmentKey('rep', series.key),
+        Math.round(model.segments[series.key] ?? 0),
+      ]),
+    ),
+  }))
+  const dayRows = (dayComparison?.points ?? []).map((day) => ({
+    ...day,
     revenue: Math.round(day.revenue),
+    priorRevenue: day.priorRevenue == null ? null : Math.round(day.priorRevenue),
   }))
 
   return (
@@ -122,6 +216,11 @@ export function MonthlySales({
       <header>
         <h2>Monthly sales</h2>
         <p>{scopeNote}</p>
+        <p>
+          Days and customer comparisons line up by working-day index (day 1 on day 1), not calendar
+          date. Weekends and Hong Kong public holidays stay off the day axis. Top customers and top
+          models run from the 1st through the end of the selected week.
+        </p>
       </header>
       <div className="monthly__grid">
         <figure className="chart-panel">
@@ -135,7 +234,7 @@ export function MonthlySales({
                 <XAxis dataKey="label" tick={{ fontSize: 12 }} />
                 <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} width={48} />
                 <Tooltip formatter={(value) => formatMoney(Number(value))} />
-                <Bar dataKey="revenue" name="Sales" radius={[4, 4, 0, 0]}>
+                <Bar dataKey="revenue" name="Sales" radius={[6, 6, 0, 0]}>
                   {chartRows.map((month) => (
                     <Cell
                       key={month.monthKey}
@@ -243,82 +342,161 @@ export function MonthlySales({
         </figure>
       </div>
 
-      <figure className="chart-panel monthly-customers">
+      <figure className="chart-panel chart-stack">
         <figcaption>Days in review month · {shareLabel}</figcaption>
         <p className="monthly__caption">
-          Working-day sell-out for the review month. Weekends and Hong Kong public holidays are
-          left off the axis. Working days with no sales are zero. The axis stops on the last day
-          that has sales.
+          {dayComparison?.hasPrior
+            ? 'Solid line runs through the last day with sales; the dashed line is the same index last month.'
+            : `No ${dayComparison?.priorMonthLabel ?? 'prior month'} lines are loaded, so only this month’s working days are shown.`}
         </p>
         {dayRows.length === 0 ? (
           <p className="monthly__empty">No daily sales in {shareLabel}.</p>
         ) : (
-          <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={dayRows}>
-              <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
-              <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-              <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} width={48} />
-              <Tooltip formatter={(value) => formatMoney(Number(value))} />
-              <Line type="monotone" dataKey="revenue" name="Revenue" stroke={TAUPE} strokeWidth={2.5} dot={{ r: 3 }} />
-            </LineChart>
-          </ResponsiveContainer>
+          <>
+            <ul className="series-legend">
+              <li>
+                <span className="series-legend__swatch" style={{ background: TAUPE }} />
+                This month
+              </li>
+              {dayComparison?.hasPrior ? (
+                <li>
+                  <span className="series-legend__swatch series-legend__swatch--dashed" />
+                  Last month
+                </li>
+              ) : null}
+            </ul>
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={dayRows}>
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} width={48} />
+                <Tooltip content={<DayTooltip />} />
+                <Line
+                  type="monotone"
+                  dataKey="revenue"
+                  name="This month"
+                  stroke={TAUPE}
+                  strokeWidth={2.5}
+                  dot={{ r: 3 }}
+                />
+                {dayComparison?.hasPrior ? (
+                  <Line
+                    type="monotone"
+                    dataKey="priorRevenue"
+                    name="Last month"
+                    stroke={OLIVE}
+                    strokeWidth={2}
+                    strokeDasharray="5 4"
+                    dot={false}
+                    connectNulls={false}
+                  />
+                ) : null}
+              </LineChart>
+            </ResponsiveContainer>
+          </>
         )}
       </figure>
 
-      <figure className="chart-panel monthly-customers">
+      <figure className="chart-panel chart-stack">
         <figcaption>{customerTitle}</figcaption>
         <p className="monthly__caption">
-          Top 10 by sell-out (HKD) for the review month. Follows the salesperson, department, and
-          search filters.
+          {customerMom?.hasPrior && customerMom.span.priorThroughDate
+            ? `This period stacks weeks from the start of ${shareLabel} through ${mtdThroughLabel} (${customerMom.span.workingDayCount} working days), compared with last month through ${customerMom.span.priorThroughDate.slice(5)}.`
+            : customerMom
+              ? `No ${customerMom.span.priorMonthLabel} lines are loaded, so this period stacks weeks from the start of ${shareLabel} through ${mtdThroughLabel} with no comparison bar.`
+              : 'Choose a review week to see month-to-date customers.'}
         </p>
         {topCustomers.length === 0 ? (
           <p className="monthly__empty">No customers in {shareLabel}.</p>
         ) : (
-          <ResponsiveContainer width="100%" height={360}>
-            <BarChart data={topCustomers} layout="vertical" margin={{ left: 8, right: 16 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={GRID} horizontal={false} />
-              <XAxis type="number" tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} />
-              <YAxis type="category" dataKey="name" width={196} tick={CustomerTick} />
-              <Tooltip
-                formatter={(value) => formatMoney(Number(value))}
-                labelFormatter={(_, payload) => {
-                  const row = payload?.[0]?.payload as { fullName?: string } | undefined
-                  return row?.fullName ?? ''
-                }}
-              />
-              <Bar dataKey="revenue" name="Sell-out" fill={customerBarColor} radius={[0, 4, 4, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <>
+            <ul className="series-legend">
+              {(customerMom?.weeks ?? []).map((week, index) => (
+                <li key={week.key}>
+                  <span className="series-legend__swatch" style={{ background: customerWeekFill(index) }} />
+                  {week.label}
+                </li>
+              ))}
+              {customerMom?.hasPrior ? (
+                <li>
+                  <span className="series-legend__swatch series-legend__swatch--muted" />
+                  Last month
+                </li>
+              ) : null}
+            </ul>
+            <ResponsiveContainer width="100%" height={520}>
+              <BarChart data={topCustomers} layout="vertical" margin={{ left: 8, right: 16 }} barGap={2}>
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} horizontal={false} />
+                <XAxis type="number" tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} />
+                <YAxis type="category" dataKey="name" width={196} tick={CustomerTick} />
+                <Tooltip content={<MomTooltip />} />
+                {(customerMom?.weeks ?? []).map((week, index) => (
+                  <Bar
+                    key={week.key}
+                    dataKey={segmentKey('week', week.key)}
+                    name={week.label}
+                    stackId="current"
+                    fill={customerWeekFill(index)}
+                    stroke={TAUPE}
+                    strokeWidth={1}
+                    isAnimationActive={false}
+                  />
+                ))}
+                {customerMom?.hasPrior ? (
+                  <Bar
+                    dataKey="prior"
+                    name="Last month"
+                    fill={OLIVE}
+                    fillOpacity={0.45}
+                    isAnimationActive={false}
+                  />
+                ) : null}
+              </BarChart>
+            </ResponsiveContainer>
+          </>
         )}
       </figure>
 
-      <figure className="chart-panel monthly-customers">
+      <figure className="chart-panel chart-stack">
         <figcaption>{modelTitle}</figcaption>
         <p className="monthly__caption">
-          Top 10 product models by quantity for the review month. Follows the salesperson,
-          department, and search filters.
+          Top 10 by quantity from the start of {shareLabel} through {mtdThroughLabel ?? 'the selected week'}, stacked by salesperson.
         </p>
         {topModels.length === 0 ? (
           <p className="monthly__empty">No product models in {shareLabel}.</p>
         ) : (
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={topModels}>
-              <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
-              <XAxis
-                dataKey="name"
-                tick={{ fontSize: 11 }}
-                interval={0}
-                angle={-30}
-                textAnchor="end"
-                height={64}
-              />
-              <YAxis />
-              <Tooltip
-                formatter={(value) => [`${Number(value).toLocaleString()} units`, 'Qty']}
-              />
-              <Bar dataKey="qty" name="Qty" fill={modelBarColor} radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <>
+            <SeriesLegend
+              items={modelSeries.map((series, index) => ({
+                label: series.label,
+                color: customerBarColor(shares, series.key, sliceColorAt(index)),
+              }))}
+            />
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={topModels}>
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fontSize: 11 }}
+                  interval={0}
+                  angle={-30}
+                  textAnchor="end"
+                  height={64}
+                />
+                <YAxis />
+                <Tooltip content={<StackTooltip format={(value) => `${value.toLocaleString()} units`} />} />
+                {modelSeries.map((series, index) => (
+                  <Bar
+                    key={series.key}
+                    dataKey={segmentKey('rep', series.key)}
+                    name={series.label}
+                    stackId="rep"
+                    fill={customerBarColor(shares, series.key, sliceColorAt(index))}
+                  />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </>
         )}
       </figure>
 

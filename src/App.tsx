@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Charts } from './components/Charts'
 import { FilterBar } from './components/FilterBar'
+import { ForecastPanel } from './components/ForecastPanel'
 import { ImportPanel } from './components/ImportPanel'
 import { KpiRow } from './components/KpiRow'
 import { LineTable } from './components/LineTable'
@@ -14,12 +15,10 @@ import {
   filterMtdThroughWeek,
   formatMonthLabel,
   formatRangeLabel,
-  groupBy,
   groupByWithPrior,
   invoiceCountsBy,
   isoWeekKey,
   listWeekKeys,
-  monthDaily,
   monthKeyFromDate,
   monthlyTotals,
   pctDelta,
@@ -33,46 +32,35 @@ import {
   uniqueCustomers,
   uniqueInvoices,
   uniqueSorted,
-  weekDateRange,
+  reviewWindow,
   weekLabel,
 } from './lib/aggregates'
+import { customerWorkingDayMom, modelRepStacks, monthDailyComparison } from './lib/chartSeries'
+import { forecastForReview, forecastScopeNote, reviewTarget } from './lib/forecast'
 import { mtdWorkingDays } from './lib/hkHolidays'
+import { initialFilters, reconcileFilters } from './lib/filters'
 import { ALL_REPS_SKU_BAR, customerBarColor } from './lib/palette'
 import { mergeImportedItems, type ImportMode } from './lib/ingest'
 import { readImportFile, type LoadedImport } from './lib/readImportFile'
 import type { Filters, LineItem, SalesPayload } from './lib/types'
+import {
+  browserWorkingSetStore,
+  loadDashboard,
+  resetDashboard,
+  saveFilters,
+  saveImport,
+} from './lib/workingSet'
 import './App.css'
 
-function initialFilters(items: LineItem[]): Filters {
-  const weeks = listWeekKeys(items)
-  return {
-    weekKey: weeks[weeks.length - 1] ?? 'all',
-    salesperson: 'all',
-    department: 'all',
-    query: '',
-  }
-}
+const workingSetStore = browserWorkingSetStore()
 
-function reconcileFilters(filters: Filters, items: LineItem[]): Filters {
-  const weeks = listWeekKeys(items)
-  const salespeople = uniqueSorted(items.map((row) => row.salesperson))
-  const departments = uniqueSorted(items.map((row) => row.department))
-  let weekKey = filters.weekKey
-  if (weekKey !== 'all' && !weeks.includes(weekKey)) {
-    weekKey = weeks[weeks.length - 1] ?? 'all'
+async function fetchSeed(kind: 'data' | 'seed' = 'data'): Promise<SalesPayload> {
+  const response = await fetch('/data/sales-line-items.json')
+  if (!response.ok) {
+    const label = kind === 'seed' ? 'seed data' : 'data'
+    throw new Error(`Failed to load ${label} (${response.status})`)
   }
-  return {
-    ...filters,
-    weekKey,
-    salesperson:
-      filters.salesperson !== 'all' && !salespeople.includes(filters.salesperson)
-        ? 'all'
-        : filters.salesperson,
-    department:
-      filters.department !== 'all' && !departments.includes(filters.department)
-        ? 'all'
-        : filters.department,
-  }
+  return (await response.json()) as SalesPayload
 }
 
 function monthlyScopeNote(filters: Filters): string {
@@ -114,19 +102,20 @@ export default function App() {
   const [importing, setImporting] = useState(false)
   const [importNote, setImportNote] = useState<string | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
   const importingRef = useRef(false)
+  const persistedRef = useRef(false)
 
   useEffect(() => {
     let cancelled = false
-    fetch('/data/sales-line-items.json')
-      .then((r) => {
-        if (!r.ok) throw new Error(`Failed to load data (${r.status})`)
-        return r.json() as Promise<SalesPayload>
-      })
-      .then((data) => {
+    loadDashboard(workingSetStore, () => fetchSeed())
+      .then((loaded) => {
         if (cancelled) return
-        setPayload(data)
-        setFilters(initialFilters(data.lineItems))
+        persistedRef.current = loaded.source === 'saved'
+        setSaved(loaded.source === 'saved')
+        setPayload(loaded.payload)
+        setFilters(loaded.filters)
+        setImportNote(loaded.note)
       })
       .catch((e: Error) => {
         if (!cancelled) setError(e.message)
@@ -135,6 +124,16 @@ export default function App() {
       cancelled = true
     }
   }, [])
+
+  function handleFilters(next: Filters) {
+    setFilters(next)
+    if (!persistedRef.current) return
+    try {
+      saveFilters(workingSetStore, next)
+    } catch {
+      // The imported lines stay saved. This filter change may reset on refresh.
+    }
+  }
 
   const weeks = useMemo(
     () => (payload ? listWeekKeys(payload.lineItems) : []),
@@ -149,11 +148,11 @@ export default function App() {
     [payload],
   )
 
-  const selectedRange =
-    filters && filters.weekKey !== 'all' ? weekDateRange(filters.weekKey) : null
+  const review = filters && filters.weekKey !== 'all' ? reviewWindow(filters.weekKey) : null
+  const selectedRange = review?.range ?? null
   const priorRange = selectedRange ? samePeriodLastMonth(selectedRange) : null
-  const workingDays = selectedRange
-    ? mtdWorkingDays(monthKeyFromDate(selectedRange.end), selectedRange.end)
+  const workingDays = review
+    ? mtdWorkingDays(review.monthKey, review.throughDate)
     : { elapsed: 0, total: 0, holidaysLoaded: false }
 
   const thisWeek = useMemo(() => {
@@ -196,48 +195,33 @@ export default function App() {
   }, [payload, filters])
   const months = useMemo(() => monthlyTotals(monthScoped), [monthScoped])
 
-  const shareMonthKey =
-    filters && filters.weekKey !== 'all' && selectedRange
-      ? monthKeyFromDate(selectedRange.end)
-      : null
-  const monthCustomers = useMemo(() => {
-    if (!payload || !filters || filters.weekKey === 'all') return []
-    const range = weekDateRange(filters.weekKey)
-    if (!range) return []
-    const monthKey = monthKeyFromDate(range.end)
-    return groupBy(
-      filterIgnoringWeek(payload.lineItems, filters).filter(
-        (row) => row.date != null && monthKeyFromDate(row.date) === monthKey,
-      ),
-      (row) => row.customer,
-    )
-  }, [payload, filters])
-  const monthModels = useMemo(() => {
-    if (!payload || !filters || filters.weekKey === 'all') return []
-    const range = weekDateRange(filters.weekKey)
-    if (!range) return []
-    const monthKey = monthKeyFromDate(range.end)
-    return groupBy(
-      filterIgnoringWeek(payload.lineItems, filters).filter(
-        (row) => row.date != null && monthKeyFromDate(row.date) === monthKey,
-      ),
-      (row) => row.productModel || row.sku,
-    )
-  }, [payload, filters])
-  const monthDays = useMemo(() => {
-    if (!payload || !filters || filters.weekKey === 'all') return []
-    const range = weekDateRange(filters.weekKey)
-    if (!range) return []
-    return monthDaily(filterIgnoringWeek(payload.lineItems, filters), monthKeyFromDate(range.end))
-  }, [payload, filters])
+  const shareMonthKey = review?.monthKey ?? null
+  const dayComparison = useMemo(
+    () => (shareMonthKey ? monthDailyComparison(monthScoped, shareMonthKey) : null),
+    [monthScoped, shareMonthKey],
+  )
+  const mtdThrough = review?.throughDate ?? null
+  const customerMom = useMemo(
+    () =>
+      shareMonthKey && mtdThrough
+        ? customerWorkingDayMom(monthScoped, shareMonthKey, mtdThrough)
+        : null,
+    [monthScoped, shareMonthKey, mtdThrough],
+  )
+  const modelStacks = useMemo(
+    () =>
+      shareMonthKey && mtdThrough
+        ? modelRepStacks(monthScoped, shareMonthKey, mtdThrough)
+        : { series: [], bars: [] },
+    [monthScoped, shareMonthKey, mtdThrough],
+  )
   const weekInvoices = useMemo(
     () => invoiceCountsBy(thisWeek, (row) => row.salesperson),
     [thisWeek],
   )
   const shareRows = useMemo(() => {
     if (!payload || !filters) return []
-    const range = filters.weekKey === 'all' ? null : weekDateRange(filters.weekKey)
-    const monthKey = range ? monthKeyFromDate(range.end) : null
+    const monthKey = filters.weekKey === 'all' ? null : reviewWindow(filters.weekKey)?.monthKey
     const base = filterIgnoringWeek(payload.lineItems, {
       weekKey: filters.weekKey,
       salesperson: 'all',
@@ -280,9 +264,18 @@ export default function App() {
         },
         lineItems: integrated.lineItems,
       }
+      const note = describeImport(loaded, mode, integrated)
+      const reconciled = reconcileFilters(filters ?? initialFilters(next.lineItems), next.lineItems)
+      try {
+        await saveImport(workingSetStore, next, reconciled, note)
+        persistedRef.current = true
+        setSaved(true)
+      } catch {
+        setImportError('This browser could not save the latest import.')
+      }
       setPayload(next)
-      setFilters((prev) => (prev ? reconcileFilters(prev, next.lineItems) : prev))
-      setImportNote(describeImport(loaded, mode, integrated))
+      setFilters(reconciled)
+      setImportNote(note)
     } catch (err) {
       setImportError(err instanceof Error && err.message ? err.message : 'Import failed.')
     } finally {
@@ -307,12 +300,12 @@ export default function App() {
     setImporting(true)
     setImportError(null)
     try {
-      const response = await fetch('/data/sales-line-items.json')
-      if (!response.ok) throw new Error(`Failed to load seed data (${response.status})`)
-      const data = (await response.json()) as SalesPayload
-      setPayload(data)
-      setFilters(initialFilters(data.lineItems))
-      setImportNote('Restored the bundled seed data.')
+      const restored = await resetDashboard(workingSetStore, () => fetchSeed('seed'))
+      persistedRef.current = false
+      setSaved(false)
+      setPayload(restored.payload)
+      setFilters(restored.filters)
+      setImportNote(restored.note)
     } catch (err) {
       setImportError(err instanceof Error && err.message ? err.message : 'Could not restore seed data.')
     } finally {
@@ -340,10 +333,18 @@ export default function App() {
   const revenue = sumRevenue(thisWeek)
   const prevRevenue = sumRevenue(priorPeriod)
   const delta = pctDelta(revenue, prevRevenue)
-  const range = selectedRange
-  const monthKey = range ? monthKeyFromDate(range.end) : '2026-10'
+  const monthKey = review?.monthKey ?? '2026-10'
   const monthTarget = teamTargetForMonth(monthKey, payload.meta.targets)
+  const pacedTarget = reviewTarget(filters.salesperson, monthKey, payload.meta.targets)
   const mtdRevenue = sumRevenue(mtd)
+  const monthForecast = selectedRange
+    ? forecastForReview({
+        monthKey,
+        throughDate: review?.throughDate ?? selectedRange.end,
+        mtdRevenue,
+        target: pacedTarget.amount,
+      })
+    : null
   const dateExtent = payload.lineItems
     .map((r) => r.date)
     .filter((d): d is string => Boolean(d))
@@ -362,7 +363,8 @@ export default function App() {
             Pick a review week, then compare it to the{' '}
             <strong>same calendar dates last month</strong> (MoM). Scan reps and
             movers, then open line detail. Monthly totals and each rep’s sell-out
-            share sit under the scorecard. Seeded from the Team Aaron Excel
+            share sit under the scorecard, with target pace and a working-day
+            forecast beside it. Seeded from the Team Aaron Excel
             examples ({dataFrom} → {dataTo}). Currency: HKD.
           </p>
         </div>
@@ -387,6 +389,7 @@ export default function App() {
         onReset={() => {
           void handleReset()
         }}
+        saved={saved}
       />
 
       <FilterBar
@@ -394,8 +397,9 @@ export default function App() {
         weeks={weeks}
         salespeople={salespeople}
         departments={departments}
-        onChange={setFilters}
+        onChange={handleFilters}
         rowCount={uniqueInvoices(thisWeek)}
+        disabled={importing}
       />
 
       <KpiRow
@@ -415,9 +419,19 @@ export default function App() {
         reviewMonthLabel={formatMonthLabel(monthKey)}
         mtdWorkingDays={workingDays.elapsed}
         monthWorkingDays={workingDays.total}
-        workingDaysThrough={selectedRange ? selectedRange.end.slice(5) : '—'}
+        workingDaysThrough={review ? review.throughDate.slice(5) : '—'}
         holidaysLoaded={workingDays.holidaysLoaded}
       />
+
+      {selectedRange && monthForecast ? (
+        <ForecastPanel
+          monthLabel={formatMonthLabel(monthKey)}
+          throughLabel={review ? review.throughDate.slice(5) : selectedRange.end.slice(5)}
+          targetLabel={pacedTarget.label}
+          scopeNote={forecastScopeNote(filters)}
+          result={monthForecast}
+        />
+      ) : null}
 
       <MonthlySales
         months={months}
@@ -427,12 +441,11 @@ export default function App() {
         scopeNote={monthlyScopeNote(filters)}
         showTarget={filters.salesperson === 'all'}
         repRows={repRows}
-        monthCustomers={monthCustomers}
-        monthDays={monthDays}
-        monthModels={monthModels}
+        dayComparison={dayComparison}
+        customerMom={customerMom}
+        modelStacks={modelStacks}
+        mtdThroughLabel={mtdThrough ? mtdThrough.slice(5) : null}
         salesperson={filters.salesperson}
-        customerBarColor={customerBarColor(shares, filters.salesperson)}
-        modelBarColor={customerBarColor(shares, filters.salesperson, ALL_REPS_SKU_BAR)}
       />
 
       <RepBoard rows={bySp} invoiceCounts={weekInvoices} />
@@ -460,7 +473,7 @@ export default function App() {
 
       <footer className="footer">
         <p>
-          Phase 2 · {uniqueInvoices(payload.lineItems).toLocaleString()} invoices · ISO week{' '}
+          Phase 3 · {uniqueInvoices(payload.lineItems).toLocaleString()} invoices · ISO week{' '}
           {filters.weekKey}
           {payload.meta.generatedFrom.some((name) => name.startsWith('import:'))
             ? ` · ${payload.meta.generatedFrom

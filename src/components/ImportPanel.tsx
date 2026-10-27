@@ -8,9 +8,10 @@ type Props = {
   onImportFile: (file: File, mode: ImportMode) => void
   onLoadSample: (mode: ImportMode) => void
   onReset: () => void
+  saved: boolean
 }
 
-export function ImportPanel({ busy, note, error, onImportFile, onLoadSample, onReset }: Props) {
+export function ImportPanel({ busy, note, error, onImportFile, onLoadSample, onReset, saved }: Props) {
   const [mode, setMode] = useState<ImportMode>('merge')
 
   return (
@@ -18,9 +19,10 @@ export function ImportPanel({ busy, note, error, onImportFile, onLoadSample, onR
       <header>
         <h2>Import raw data</h2>
         <p>
-          Upload a Kingdee-style CSV or Excel export to update the dashboard. Applies to this
-          session — refresh reloads the bundled seed. Auto-sync is not connected; this uses the
-          same ingest a future sync would call.
+          Upload a Kingdee-style CSV or Excel export to update the dashboard. Merge and Replace
+          are saved in this browser and come back after a refresh. Reset to seed clears that
+          save and reloads the bundled file. Auto-sync is not connected; this uses the same
+          ingest a future sync would call.
         </p>
       </header>
       <div className="import-panel__controls">
@@ -74,6 +76,7 @@ export function ImportPanel({ busy, note, error, onImportFile, onLoadSample, onR
         </p>
       ) : null}
       {note ? <p className="import-panel__note">{note}</p> : null}
+      {saved ? <p className="import-panel__saved">Working set saved in this browser.</p> : null}
     </section>
   )
 }

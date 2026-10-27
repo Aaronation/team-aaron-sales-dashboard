@@ -1,7 +1,15 @@
 import { isWorkingDay } from './hkHolidays'
 import type { Filters, LineItem, Targets } from './types'
 
+/** 2026 team sell-out targets (HKD), from Aaron’s monthly target sheet. */
 export const MONTHLY_TEAM_TARGETS: Record<string, number> = {
+  '2026-01': 2_800_000,
+  '2026-02': 2_200_000,
+  '2026-03': 2_700_000,
+  '2026-04': 2_900_000,
+  '2026-05': 2_800_000,
+  '2026-06': 3_000_000,
+  '2026-07': 3_500_000,
   '2026-08': 3_500_000,
   '2026-09': 3_300_000,
   '2026-10': 3_300_000,
@@ -45,6 +53,39 @@ export function weekDateRange(weekKey: string): { start: string; end: string } |
   return {
     start: start.toISOString().slice(0, 10),
     end: end.toISOString().slice(0, 10),
+  }
+}
+
+function monthEndIso(monthKey: string): string {
+  const [year, month] = monthKey.split('-').map(Number)
+  const last = new Date(Date.UTC(year, month, 0)).getUTCDate()
+  return `${monthKey}-${String(last).padStart(2, '0')}`
+}
+
+export type ReviewWindow = {
+  range: { start: string; end: string }
+  /** Month of the week's Thursday. A Mon–Sun week that ends on the 1st stays in the month that holds Mon–Thu. */
+  monthKey: string
+  /** Week end, clamped to the last day of `monthKey`. */
+  throughDate: string
+}
+
+/**
+ * Review month and MTD cutoff for a week.
+ * ISO weeks are named by Thursday, so 2026-W44 (10-26 → 11-01) is still October.
+ * Using Sunday 11-01 as the month made MTD and the monthly charts look at an empty November.
+ */
+export function reviewWindow(weekKey: string): ReviewWindow | null {
+  const range = weekDateRange(weekKey)
+  if (!range) return null
+  const thursday = new Date(range.start + 'T12:00:00Z')
+  thursday.setUTCDate(thursday.getUTCDate() + 3)
+  const monthKey = thursday.toISOString().slice(0, 7)
+  const monthLast = monthEndIso(monthKey)
+  return {
+    range,
+    monthKey,
+    throughDate: range.end > monthLast ? monthLast : range.end,
   }
 }
 
@@ -283,16 +324,15 @@ export function filterByDateRange(
   })
 }
 
-/** Month-to-date items in the same calendar month as the week's Thursday (or end). */
+/** Month-to-date items in the review month (the week's Thursday) through `reviewWindow().throughDate`. */
 export function filterMtdThroughWeek(items: LineItem[], f: Filters, weekKey: string): LineItem[] {
-  const range = weekDateRange(weekKey)
-  if (!range) return []
-  const monthKey = monthKeyFromDate(range.end)
+  const window = reviewWindow(weekKey)
+  if (!window) return []
   const q = f.query.trim().toLowerCase()
   return items.filter((row) => {
     if (!row.date) return false
-    if (monthKeyFromDate(row.date) !== monthKey) return false
-    if (row.date > range.end) return false
+    if (monthKeyFromDate(row.date) !== window.monthKey) return false
+    if (row.date > window.throughDate) return false
     if (f.salesperson !== 'all' && row.salesperson !== f.salesperson) return false
     if (f.department !== 'all' && row.department !== f.department) return false
     if (!q) return true
