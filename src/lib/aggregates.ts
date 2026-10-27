@@ -1,7 +1,15 @@
 import { isWorkingDay } from './hkHolidays'
 import type { Filters, LineItem, Targets } from './types'
 
+/** 2026 team sell-out targets (HKD), from Aaron’s monthly target sheet. */
 export const MONTHLY_TEAM_TARGETS: Record<string, number> = {
+  '2026-01': 2_800_000,
+  '2026-02': 2_200_000,
+  '2026-03': 2_700_000,
+  '2026-04': 2_900_000,
+  '2026-05': 2_800_000,
+  '2026-06': 3_000_000,
+  '2026-07': 3_500_000,
   '2026-08': 3_500_000,
   '2026-09': 3_300_000,
   '2026-10': 3_300_000,

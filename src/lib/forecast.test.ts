@@ -1,6 +1,7 @@
 /// <reference types="node" />
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { DEFAULT_SPLITS, teamTargetForMonth } from './aggregates'
 import { isWorkingDay } from './hkHolidays'
 import {
   describePace,
@@ -153,6 +154,30 @@ describe('working-day pace and forecast', () => {
 })
 
 describe('review target', () => {
+  it('uses Aaron’s 2026 monthly team targets and leaves the rep splits', () => {
+    const sheet: Record<string, number> = {
+      '2026-01': 2_800_000,
+      '2026-02': 2_200_000,
+      '2026-03': 2_700_000,
+      '2026-04': 2_900_000,
+      '2026-05': 2_800_000,
+      '2026-06': 3_000_000,
+      '2026-07': 3_500_000,
+      '2026-08': 3_500_000,
+      '2026-09': 3_300_000,
+      '2026-10': 3_300_000,
+      '2026-11': 3_200_000,
+      '2026-12': 3_400_000,
+    }
+    for (const [month, amount] of Object.entries(sheet)) {
+      expect(teamTargetForMonth(month, targets)).toBe(amount)
+      expect(reviewTarget('all', month, targets)).toEqual({ label: 'Team target', amount })
+    }
+    expect(DEFAULT_SPLITS).toEqual({ 'Aaron Chang': 0.49, 'Kelvin Lai': 0.31, 'Kenny Ma': 0.2 })
+    expect(reviewTarget('Aaron Chang', '2026-01', targets).amount).toBe(2_800_000 * 0.49)
+    expect(reviewTarget('Aaron Chang', '2026-10', targets).amount).toBe(3_300_000 * 0.49)
+  })
+
   it('uses the team month target, a rep split, or no target', () => {
     expect(reviewTarget('all', '2026-10', targets)).toEqual({ label: 'Team target', amount: 3_300_000 })
     expect(reviewTarget('Aaron Chang', '2026-10', targets)).toEqual({
