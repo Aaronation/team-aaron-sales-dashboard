@@ -79,7 +79,8 @@ V=(node "$ROOT/.cursor/skills/verify-sales-dashboard/helpers/verify.mjs")
 "${V[@]}" expect-text --text "Replaced dashboard data with 5 rows from sample-kingdee-import.csv (2026-11-02 → 2026-11-12)." --scope "Import raw data"
 "${V[@]}" expect-text --text "Working set saved in this browser." --scope "Import raw data"
 "${V[@]}" expect-row --scope "Monthly sales" --row "Nov 2026" --text 'HK$30,000'
-"${V[@]}" expect-absent --text "Oct 2026" --scope "Monthly sales"
+"${V[@]}" expect-text --text "No Oct 2026 lines are loaded" --scope "Monthly sales"
+"${V[@]}" expect-absent --text "Oct 2026 · review month" --scope "Monthly sales"
 "${V[@]}" expect-text --text "Nov 2026 · 9 of 21 working days through 11-12. HK public holidays excluded." --scope "Targets and forecast"
 "${V[@]}" expect-text --text 'HK$70,000' --scope "Targets and forecast"
 "${V[@]}" expect-text --text 'HK$30,000 is below the straight-line HK$1,371,429.' --scope "Targets and forecast"
