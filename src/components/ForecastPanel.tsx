@@ -3,13 +3,13 @@ import { formatMoney } from '../lib/aggregates'
 
 type Props = {
   monthLabel: string
-  throughLabel: string
   targetLabel: string
   scopeNote: string
   result: WorkingDayForecast
 }
 
-export function ForecastPanel({ monthLabel, throughLabel, targetLabel, scopeNote, result }: Props) {
+export function ForecastPanel({ monthLabel, targetLabel, scopeNote, result }: Props) {
+  const throughLabel = result.elapsedThrough ? result.elapsedThrough.slice(5) : '—'
   const share = shareOfTargetLabel(result.mtdRevenue, result.target)
   const holidayNote = result.holidaysLoaded ? 'HK public holidays excluded.' : 'Weekends excluded.'
   const paceClass =

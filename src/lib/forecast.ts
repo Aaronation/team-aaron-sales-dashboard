@@ -10,6 +10,8 @@ export type WorkingDayForecast = {
   elapsedWorkingDays: number
   totalWorkingDays: number
   holidaysLoaded: boolean
+  /** Latest entry in the month, not past the review-week ceiling. Null when that month has no entries. */
+  elapsedThrough: string | null
   /** Target × elapsed / total working days. Null when pace cannot be judged. */
   expectedMtd: number | null
   pace: Pace | null
@@ -52,14 +54,15 @@ export function workingDayForecast(input: {
   return { expectedMtd, pace, forecast }
 }
 
-/** Pace and forecast for the review week’s month, using Hong Kong working days. */
+/** Pace and forecast for the review week’s month, using the same elapsed-day cap as the scorecard. */
 export function forecastForReview(input: {
   monthKey: string
   throughDate: string
+  entryDates: readonly (string | null | undefined)[]
   mtdRevenue: number
   target: number
 }): WorkingDayForecast {
-  const days = mtdWorkingDays(input.monthKey, input.throughDate)
+  const days = mtdWorkingDays(input.monthKey, input.throughDate, input.entryDates)
   const projected = workingDayForecast({
     target: input.target,
     mtdRevenue: input.mtdRevenue,
@@ -72,6 +75,7 @@ export function forecastForReview(input: {
     elapsedWorkingDays: days.elapsed,
     totalWorkingDays: days.total,
     holidaysLoaded: days.holidaysLoaded,
+    elapsedThrough: days.through,
     ...projected,
   }
 }

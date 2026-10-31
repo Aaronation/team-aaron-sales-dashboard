@@ -79,10 +79,10 @@ Under the weekly scorecard, **Targets and forecast** shows the review month:
 
 - **Team target** for the month (or that rep’s split when a salesperson is selected).
 - **MTD sell-out** through the end of the review week.
-- **Pace** — On track when MTD is at or above a straight line from zero to the target across Hong Kong working days; Behind when it is below. Weekends and gazetted HK holidays are excluded.
-- **Forecast** — MTD divided by elapsed working days, times the working days in the month.
+- **Pace** — On track when MTD is at or above a straight line from zero to the target across Hong Kong working days; Behind when it is below. Weekends and gazetted HK holidays are excluded. Elapsed days stop at the latest entry in the review month, and do not run past the review week.
+- **Forecast** — MTD divided by those elapsed working days, times the working days in the month.
 
-October 2026 on the seeded week `2026-W42` is behind: MTD `HK$725,442` against a straight-line `HK$1,815,000`, forecast `HK$1,318,985`.
+October 2026 on the seeded week `2026-W42` is behind: MTD `HK$725,442` against a straight-line `HK$1,155,000`, forecast `HK$2,072,690`. The latest October entry is `2026-10-12`, so the month is 7 of 20 working days.
 
 ## Stack
 
