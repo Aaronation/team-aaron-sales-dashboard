@@ -1,7 +1,18 @@
 /// <reference types="node" />
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { asp, averageSellingPrice, filterItems, filterMtdThroughWeek, formatAsp, sumQty, sumRevenue } from './aggregates'
+import {
+  asp,
+  averageSellingPrice,
+  filterIgnoringWeek,
+  filterItems,
+  filterMtdThroughWeek,
+  formatAsp,
+  monthlyRepAsp,
+  monthlyTotals,
+  sumQty,
+  sumRevenue,
+} from './aggregates'
 import type { LineItem } from './types'
 
 function line(
@@ -83,6 +94,37 @@ describe('average selling price', () => {
     expect(asp(aaron)).toBe(100)
     expect(asp(week.filter((row) => row.salesperson === 'Kelvin Lai'))).toBe(300)
   })
+
+  it('puts team ASP on each month and uses sell-out ÷ units for the all-months total', () => {
+    const items = [
+      line(100, 2, { date: '2026-10-02', salesperson: 'Aaron Chang', invoice: 'a' }),
+      line(300, 1, { date: '2026-10-03', salesperson: 'Kelvin Lai', invoice: 'k' }),
+      line(50, 0, { date: '2026-09-04', salesperson: 'Aaron Chang', invoice: 'z' }),
+    ]
+    const months = monthlyTotals(items)
+    const october = months.find((month) => month.monthKey === '2026-10')
+    const september = months.find((month) => month.monthKey === '2026-09')
+    expect(october).toMatchObject({ revenue: 400, quantity: 3, asp: 400 / 3 })
+    expect(formatAsp(october?.asp ?? null)).toBe('HK$133.33')
+    expect(september).toMatchObject({ revenue: 50, quantity: 0, asp: null })
+    expect(formatAsp(september?.asp ?? null)).toBe('—')
+
+    const grandRevenue = months.reduce((sum, month) => sum + month.revenue, 0)
+    const grandQty = months.reduce((sum, month) => sum + month.quantity, 0)
+    expect(averageSellingPrice(grandRevenue, grandQty)).toBe(150)
+    expect(formatAsp(averageSellingPrice(grandRevenue, grandQty))).toBe('HK$150.00')
+
+    const reps = monthlyRepAsp(items)
+    expect(reps.reps.slice(0, 3)).toEqual(['Aaron Chang', 'Kelvin Lai', 'Kenny Ma'])
+    expect(reps.byMonth.get('2026-10')?.get('Aaron Chang')).toBe(50)
+    expect(reps.byMonth.get('2026-10')?.get('Kelvin Lai')).toBe(300)
+    expect(reps.byMonth.get('2026-10')?.get('Kenny Ma')).toBeNull()
+    expect(reps.byMonth.get('2026-09')?.get('Aaron Chang')).toBeNull()
+    expect(reps.totals.get('Aaron Chang')).toBe(75)
+    expect(reps.totals.get('Kelvin Lai')).toBe(300)
+    expect(reps.totals.get('Kenny Ma')).toBeNull()
+    expect(formatAsp(reps.byMonth.get('2026-10')?.get('Kelvin Lai') ?? null)).toBe('HK$300.00')
+  })
 })
 
 describe('seed ASP', () => {
@@ -123,6 +165,69 @@ describe('seed ASP', () => {
       kelvinWeek: 'HK$161.94',
       aaronMtd: 'HK$94.01',
       kelvinMtd: 'HK$158.93',
+    })
+  })
+
+  it('locks seed monthly metrics ASP for the team and each rep', () => {
+    const items = filterIgnoringWeek(payload.lineItems, {
+      weekKey: 'all',
+      salesperson: 'all',
+      department: 'all',
+      query: '',
+    })
+    const months = monthlyTotals(items)
+    const reps = monthlyRepAsp(items)
+    const grandRevenue = months.reduce((sum, month) => sum + month.revenue, 0)
+    const grandQty = months.reduce((sum, month) => sum + month.quantity, 0)
+    const october = months.find((month) => month.monthKey === '2026-10')
+    expect(formatAsp(october?.asp ?? null)).toBe('HK$113.65')
+    expect(formatAsp(reps.byMonth.get('2026-10')?.get('Aaron Chang') ?? null)).toBe('HK$94.01')
+    expect(formatAsp(reps.byMonth.get('2026-10')?.get('Kelvin Lai') ?? null)).toBe('HK$158.93')
+    expect(averageSellingPrice(grandRevenue, grandQty)).toBe(grandRevenue / grandQty)
+    expect({
+      months: months.map((month) => ({
+        label: month.label,
+        asp: formatAsp(month.asp),
+        aaron: formatAsp(reps.byMonth.get(month.monthKey)?.get('Aaron Chang') ?? null),
+        kelvin: formatAsp(reps.byMonth.get(month.monthKey)?.get('Kelvin Lai') ?? null),
+        kenny: formatAsp(reps.byMonth.get(month.monthKey)?.get('Kenny Ma') ?? null),
+      })),
+      all: {
+        asp: formatAsp(averageSellingPrice(grandRevenue, grandQty)),
+        aaron: formatAsp(reps.totals.get('Aaron Chang') ?? null),
+        kelvin: formatAsp(reps.totals.get('Kelvin Lai') ?? null),
+        kenny: formatAsp(reps.totals.get('Kenny Ma') ?? null),
+      },
+    }).toEqual({
+      months: [
+        {
+          label: 'Aug 2026',
+          asp: 'HK$124.82',
+          aaron: 'HK$107.63',
+          kelvin: 'HK$163.05',
+          kenny: 'HK$144.39',
+        },
+        {
+          label: 'Sep 2026',
+          asp: 'HK$83.96',
+          aaron: 'HK$106.55',
+          kelvin: 'HK$59.09',
+          kenny: 'HK$128.97',
+        },
+        {
+          label: 'Oct 2026',
+          asp: 'HK$113.65',
+          aaron: 'HK$94.01',
+          kelvin: 'HK$158.93',
+          kenny: 'HK$125.02',
+        },
+      ],
+      all: {
+        asp: 'HK$99.50',
+        aaron: 'HK$105.07',
+        kelvin: 'HK$82.48',
+        kenny: 'HK$133.94',
+      },
     })
   })
 })

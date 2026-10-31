@@ -22,6 +22,7 @@ import {
   isoWeekKey,
   listWeekKeys,
   monthKeyFromDate,
+  monthlyRepAsp,
   monthlyTotals,
   pctDelta,
   repMonthAchievements,
@@ -200,6 +201,7 @@ export default function App() {
     return filterIgnoringWeek(payload.lineItems, filters)
   }, [payload, filters])
   const months = useMemo(() => monthlyTotals(monthScoped), [monthScoped])
+  const repMonthAsp = useMemo(() => monthlyRepAsp(monthScoped), [monthScoped])
 
   const shareMonthKey = review?.monthKey ?? null
   const dayComparison = useMemo(
@@ -457,6 +459,7 @@ export default function App() {
         mtdThroughLabel={mtdThrough ? mtdThrough.slice(5) : null}
         salesperson={filters.salesperson}
         teamMtdAsp={mtdAsp}
+        repMonthAsp={repMonthAsp}
         mtdAspByRep={
           new Map(
             groupBy(mtd, (row) => row.salesperson || 'Unassigned').map((row) => [row.name, row.asp]),

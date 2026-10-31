@@ -179,12 +179,14 @@ export type MonthTotal = {
   quantity: number
   invoices: number
   customers: number
+  /** Sell-out ÷ units for the lines in this month. Null when units are zero. */
+  asp: number | null
 }
 
 export function monthlyTotals(items: LineItem[]): MonthTotal[] {
   const map = new Map<
     string,
-    Omit<MonthTotal, 'invoices' | 'customers'> & {
+    Omit<MonthTotal, 'invoices' | 'customers' | 'asp'> & {
       customerSet: Set<string>
       invoiceSet: Set<string>
     }
@@ -214,8 +216,65 @@ export function monthlyTotals(items: LineItem[]): MonthTotal[] {
       ...rest,
       customers: customerSet.size,
       invoices: invoiceSet.size,
+      asp: averageSellingPrice(rest.revenue, rest.quantity),
     }))
     .sort((a, b) => a.monthKey.localeCompare(b.monthKey))
+}
+
+export type MonthlyRepAsp = {
+  /** Aaron, Kelvin, Kenny, then any other salesperson who has lines. */
+  reps: string[]
+  /** Calendar month → salesperson → ASP. Missing lines are null. */
+  byMonth: Map<string, Map<string, number | null>>
+  /** Salesperson → ASP across every line passed in. */
+  totals: Map<string, number | null>
+}
+
+/** Per-rep ASP for the same lines that feed the monthly metrics table. */
+export function monthlyRepAsp(items: LineItem[]): MonthlyRepAsp {
+  const byMonthRaw = new Map<string, Map<string, { revenue: number; quantity: number }>>()
+  const totalRaw = new Map<string, { revenue: number; quantity: number }>()
+  const seen = new Set<string>()
+
+  for (const row of items) {
+    if (!row.date) continue
+    const name = row.salesperson || 'Unassigned'
+    seen.add(name)
+    const monthKey = monthKeyFromDate(row.date)
+    let month = byMonthRaw.get(monthKey)
+    if (!month) {
+      month = new Map()
+      byMonthRaw.set(monthKey, month)
+    }
+    const cell = month.get(name) ?? { revenue: 0, quantity: 0 }
+    cell.revenue += row.totalAmount || 0
+    cell.quantity += row.quantity || 0
+    month.set(name, cell)
+    const all = totalRaw.get(name) ?? { revenue: 0, quantity: 0 }
+    all.revenue += row.totalAmount || 0
+    all.quantity += row.quantity || 0
+    totalRaw.set(name, all)
+  }
+
+  const extras = [...seen]
+    .filter((name) => DEFAULT_SPLITS[name] == null)
+    .sort((a, b) => a.localeCompare(b))
+  const reps = [...Object.keys(DEFAULT_SPLITS), ...extras]
+  const byMonth = new Map<string, Map<string, number | null>>()
+  for (const [monthKey, month] of byMonthRaw) {
+    const aspByRep = new Map<string, number | null>()
+    for (const name of reps) {
+      const cell = month.get(name)
+      aspByRep.set(name, cell ? averageSellingPrice(cell.revenue, cell.quantity) : null)
+    }
+    byMonth.set(monthKey, aspByRep)
+  }
+  const totals = new Map<string, number | null>()
+  for (const name of reps) {
+    const cell = totalRaw.get(name)
+    totals.set(name, cell ? averageSellingPrice(cell.revenue, cell.quantity) : null)
+  }
+  return { reps, byMonth, totals }
 }
 
 export type SellOutShare = {
