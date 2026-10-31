@@ -50,7 +50,7 @@ describe('average selling price', () => {
     expect(sumQty(items)).toBe(3)
     expect(asp(items)).toBe(500)
     expect(averageSellingPrice(1500, 3)).toBe(500)
-    expect(formatAsp(asp(items))).toBe('HK$500.00')
+    expect(formatAsp(asp(items))).toBe('HK$500')
   })
 
   it('returns null when quantity sums to zero', () => {
@@ -64,12 +64,15 @@ describe('average selling price', () => {
   it('ignores a zero-qty line in the denominator and keeps its sell-out in the numerator', () => {
     const items = [line(100, 2), line(50, 0, { invoice: 'Z' })]
     expect(asp(items)).toBe(75)
-    expect(formatAsp(75)).toBe('HK$75.00')
+    expect(formatAsp(75)).toBe('HK$75')
+    expect(formatAsp(113.65)).toBe('HK$114')
+    expect(formatAsp(99.5)).toBe('HK$100')
+    expect(formatAsp(106.72)).toBe('HK$107')
   })
 
   it('keeps a negative unit total when returns exceed sales', () => {
     expect(asp([line(100, -4)])).toBe(-25)
-    expect(formatAsp(-25)).toBe('-HK$25.00')
+    expect(formatAsp(-25)).toBe('-HK$25')
   })
 
   it('follows the same week and salesperson filters as revenue', () => {
@@ -105,14 +108,14 @@ describe('average selling price', () => {
     const october = months.find((month) => month.monthKey === '2026-10')
     const september = months.find((month) => month.monthKey === '2026-09')
     expect(october).toMatchObject({ revenue: 400, quantity: 3, asp: 400 / 3 })
-    expect(formatAsp(october?.asp ?? null)).toBe('HK$133.33')
+    expect(formatAsp(october?.asp ?? null)).toBe('HK$133')
     expect(september).toMatchObject({ revenue: 50, quantity: 0, asp: null })
     expect(formatAsp(september?.asp ?? null)).toBe('—')
 
     const grandRevenue = months.reduce((sum, month) => sum + month.revenue, 0)
     const grandQty = months.reduce((sum, month) => sum + month.quantity, 0)
     expect(averageSellingPrice(grandRevenue, grandQty)).toBe(150)
-    expect(formatAsp(averageSellingPrice(grandRevenue, grandQty))).toBe('HK$150.00')
+    expect(formatAsp(averageSellingPrice(grandRevenue, grandQty))).toBe('HK$150')
 
     const reps = monthlyRepAsp(items)
     expect(reps.reps.slice(0, 3)).toEqual(['Aaron Chang', 'Kelvin Lai', 'Kenny Ma'])
@@ -123,7 +126,7 @@ describe('average selling price', () => {
     expect(reps.totals.get('Aaron Chang')).toBe(75)
     expect(reps.totals.get('Kelvin Lai')).toBe(300)
     expect(reps.totals.get('Kenny Ma')).toBeNull()
-    expect(formatAsp(reps.byMonth.get('2026-10')?.get('Kelvin Lai') ?? null)).toBe('HK$300.00')
+    expect(formatAsp(reps.byMonth.get('2026-10')?.get('Kelvin Lai') ?? null)).toBe('HK$300')
   })
 })
 
@@ -159,12 +162,12 @@ describe('seed ASP', () => {
       aaronMtd: formatAsp(asp(aaronMtd)),
       kelvinMtd: formatAsp(asp(kelvinMtd)),
     }).toEqual({
-      teamWeek: 'HK$106.72',
-      teamMtd: 'HK$113.65',
-      aaronWeek: 'HK$97.42',
-      kelvinWeek: 'HK$161.94',
-      aaronMtd: 'HK$94.01',
-      kelvinMtd: 'HK$158.93',
+      teamWeek: 'HK$107',
+      teamMtd: 'HK$114',
+      aaronWeek: 'HK$97',
+      kelvinWeek: 'HK$162',
+      aaronMtd: 'HK$94',
+      kelvinMtd: 'HK$159',
     })
   })
 
@@ -180,15 +183,15 @@ describe('seed ASP', () => {
     const grandRevenue = months.reduce((sum, month) => sum + month.revenue, 0)
     const grandQty = months.reduce((sum, month) => sum + month.quantity, 0)
     const october = months.find((month) => month.monthKey === '2026-10')
-    expect(formatAsp(october?.asp ?? null)).toBe('HK$113.65')
+    expect(formatAsp(october?.asp ?? null)).toBe('HK$114')
     const aaronMonths = monthlyTotals(
       filterIgnoringWeek(payload.lineItems, { ...filters, salesperson: 'Aaron Chang' }),
     )
     expect(formatAsp(aaronMonths.find((month) => month.monthKey === '2026-10')?.asp ?? null)).toBe(
-      'HK$94.01',
+      'HK$94',
     )
-    expect(formatAsp(reps.byMonth.get('2026-10')?.get('Aaron Chang') ?? null)).toBe('HK$94.01')
-    expect(formatAsp(reps.byMonth.get('2026-10')?.get('Kelvin Lai') ?? null)).toBe('HK$158.93')
+    expect(formatAsp(reps.byMonth.get('2026-10')?.get('Aaron Chang') ?? null)).toBe('HK$94')
+    expect(formatAsp(reps.byMonth.get('2026-10')?.get('Kelvin Lai') ?? null)).toBe('HK$159')
     expect(averageSellingPrice(grandRevenue, grandQty)).toBe(grandRevenue / grandQty)
     expect({
       months: months.map((month) => ({
@@ -208,31 +211,31 @@ describe('seed ASP', () => {
       months: [
         {
           label: 'Aug 2026',
-          asp: 'HK$124.82',
-          aaron: 'HK$107.63',
-          kelvin: 'HK$163.05',
-          kenny: 'HK$144.39',
+          asp: 'HK$125',
+          aaron: 'HK$108',
+          kelvin: 'HK$163',
+          kenny: 'HK$144',
         },
         {
           label: 'Sep 2026',
-          asp: 'HK$83.96',
-          aaron: 'HK$106.55',
-          kelvin: 'HK$59.09',
-          kenny: 'HK$128.97',
+          asp: 'HK$84',
+          aaron: 'HK$107',
+          kelvin: 'HK$59',
+          kenny: 'HK$129',
         },
         {
           label: 'Oct 2026',
-          asp: 'HK$113.65',
-          aaron: 'HK$94.01',
-          kelvin: 'HK$158.93',
-          kenny: 'HK$125.02',
+          asp: 'HK$114',
+          aaron: 'HK$94',
+          kelvin: 'HK$159',
+          kenny: 'HK$125',
         },
       ],
       all: {
-        asp: 'HK$99.50',
-        aaron: 'HK$105.07',
-        kelvin: 'HK$82.48',
-        kenny: 'HK$133.94',
+        asp: 'HK$99',
+        aaron: 'HK$105',
+        kelvin: 'HK$82',
+        kenny: 'HK$134',
       },
     })
   })

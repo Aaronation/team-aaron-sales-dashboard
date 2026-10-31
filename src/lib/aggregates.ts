@@ -565,15 +565,10 @@ export function formatMoney(n: number): string {
   }).format(n)
 }
 
-/** Unit ASP in HKD with cents. Null (no units) is an em dash. */
+/** Unit ASP in whole HKD, same rounding as other money. Null (no units) is an em dash. */
 export function formatAsp(value: number | null): string {
   if (value == null || !Number.isFinite(value)) return '—'
-  return new Intl.NumberFormat('en-HK', {
-    style: 'currency',
-    currency: 'HKD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value)
+  return formatMoney(value)
 }
 
 export function formatPct(n: number): string {
