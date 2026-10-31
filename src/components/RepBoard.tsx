@@ -1,5 +1,5 @@
 import type { NamedDelta } from '../lib/aggregates'
-import { formatMoney, formatPct, shortName } from '../lib/aggregates'
+import { formatAsp, formatMoney, formatPct, shortName } from '../lib/aggregates'
 
 type Props = { rows: NamedDelta[]; invoiceCounts: Map<string, number> }
 
@@ -26,7 +26,7 @@ export function RepBoard({ rows, invoiceCounts }: Props) {
                 <strong>{shortName(r.name)}</strong>
                 <span className="muted">
                   {(invoiceCounts.get(r.name) ?? 0).toLocaleString()} invoices ·{' '}
-                  {r.quantity.toLocaleString()} units
+                  {r.quantity.toLocaleString()} units · ASP {formatAsp(r.asp)}
                 </span>
               </div>
               <div className="rep-board__nums">

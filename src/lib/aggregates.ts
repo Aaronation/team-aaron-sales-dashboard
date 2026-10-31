@@ -358,6 +358,17 @@ export function sumQty(items: LineItem[]): number {
   return items.reduce((s, r) => s + (r.quantity || 0), 0)
 }
 
+/** Tax-inclusive sell-out divided by units. Zero units is null, not zero. */
+export function averageSellingPrice(revenue: number, quantity: number): number | null {
+  if (!Number.isFinite(revenue) || !Number.isFinite(quantity) || quantity === 0) return null
+  return revenue / quantity
+}
+
+/** ASP for a filtered line set: sum(totalAmount) / sum(quantity). */
+export function asp(items: LineItem[]): number | null {
+  return averageSellingPrice(sumRevenue(items), sumQty(items))
+}
+
 export function uniqueCustomers(items: LineItem[]): number {
   return new Set(items.map((r) => r.customer).filter(Boolean)).size
 }
@@ -385,13 +396,19 @@ export function invoiceCountsBy(
   return new Map([...sets].map(([key, invoices]) => [key, invoices.size]))
 }
 
-export type NamedTotal = { name: string; revenue: number; quantity: number; lines: number }
+export type NamedTotal = {
+  name: string
+  revenue: number
+  quantity: number
+  lines: number
+  asp: number | null
+}
 
 export function groupBy(
   items: LineItem[],
   keyFn: (r: LineItem) => string | null | undefined,
 ): NamedTotal[] {
-  const map = new Map<string, NamedTotal>()
+  const map = new Map<string, Omit<NamedTotal, 'asp'>>()
   for (const r of items) {
     const k = keyFn(r)
     if (!k) continue
@@ -401,7 +418,9 @@ export function groupBy(
     cur.lines += 1
     map.set(k, cur)
   }
-  return [...map.values()].sort((a, b) => b.revenue - a.revenue)
+  return [...map.values()]
+    .map((row) => ({ ...row, asp: averageSellingPrice(row.revenue, row.quantity) }))
+    .sort((a, b) => b.revenue - a.revenue)
 }
 
 export type NamedDelta = NamedTotal & {
@@ -485,6 +504,17 @@ export function formatMoney(n: number): string {
     currency: 'HKD',
     maximumFractionDigits: 0,
   }).format(n)
+}
+
+/** Unit ASP in HKD with cents. Null (no units) is an em dash. */
+export function formatAsp(value: number | null): string {
+  if (value == null || !Number.isFinite(value)) return '—'
+  return new Intl.NumberFormat('en-HK', {
+    style: 'currency',
+    currency: 'HKD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value)
 }
 
 export function formatPct(n: number): string {

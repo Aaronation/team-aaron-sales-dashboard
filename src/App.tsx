@@ -12,8 +12,10 @@ import {
   filterByDateRange,
   filterIgnoringWeek,
   filterItems,
+  asp,
   filterMtdThroughWeek,
   formatMonthLabel,
+  groupBy,
   formatRangeLabel,
   groupByWithPrior,
   invoiceCountsBy,
@@ -341,6 +343,8 @@ export default function App() {
   const monthTarget = teamTargetForMonth(monthKey, payload.meta.targets)
   const pacedTarget = reviewTarget(filters.salesperson, monthKey, payload.meta.targets)
   const mtdRevenue = sumRevenue(mtd)
+  const weekAsp = asp(thisWeek)
+  const mtdAsp = asp(mtd)
   const monthForecast = selectedRange
     ? forecastForReview({
         monthKey,
@@ -417,6 +421,8 @@ export default function App() {
         prevCustomers={uniqueCustomers(priorPeriod)}
         quantity={sumQty(thisWeek)}
         invoices={uniqueInvoices(thisWeek)}
+        weekAsp={weekAsp}
+        mtdAsp={mtdAsp}
         mtdRevenue={mtdRevenue}
         monthTarget={monthTarget}
         monthLabel={monthKey}
@@ -450,6 +456,12 @@ export default function App() {
         modelStacks={modelStacks}
         mtdThroughLabel={mtdThrough ? mtdThrough.slice(5) : null}
         salesperson={filters.salesperson}
+        teamMtdAsp={mtdAsp}
+        mtdAspByRep={
+          new Map(
+            groupBy(mtd, (row) => row.salesperson || 'Unassigned').map((row) => [row.name, row.asp]),
+          )
+        }
       />
 
       <RepBoard rows={bySp} invoiceCounts={weekInvoices} />
