@@ -12,8 +12,10 @@ import {
   filterByDateRange,
   filterIgnoringWeek,
   filterItems,
+  asp,
   filterMtdThroughWeek,
   formatMonthLabel,
+  groupBy,
   formatRangeLabel,
   groupByWithPrior,
   invoiceCountsBy,
@@ -148,12 +150,16 @@ export default function App() {
     [payload],
   )
 
+  const entryDates = useMemo(
+    () => (payload ? payload.lineItems.map((row) => row.date) : []),
+    [payload],
+  )
   const review = filters && filters.weekKey !== 'all' ? reviewWindow(filters.weekKey) : null
   const selectedRange = review?.range ?? null
   const priorRange = selectedRange ? samePeriodLastMonth(selectedRange) : null
   const workingDays = review
-    ? mtdWorkingDays(review.monthKey, review.throughDate)
-    : { elapsed: 0, total: 0, holidaysLoaded: false }
+    ? mtdWorkingDays(review.monthKey, review.throughDate, entryDates)
+    : { elapsed: 0, total: 0, holidaysLoaded: false, through: null }
 
   const thisWeek = useMemo(() => {
     if (!payload || !filters) return []
@@ -337,10 +343,13 @@ export default function App() {
   const monthTarget = teamTargetForMonth(monthKey, payload.meta.targets)
   const pacedTarget = reviewTarget(filters.salesperson, monthKey, payload.meta.targets)
   const mtdRevenue = sumRevenue(mtd)
+  const weekAsp = asp(thisWeek)
+  const mtdAsp = asp(mtd)
   const monthForecast = selectedRange
     ? forecastForReview({
         monthKey,
         throughDate: review?.throughDate ?? selectedRange.end,
+        entryDates,
         mtdRevenue,
         target: pacedTarget.amount,
       })
@@ -412,6 +421,8 @@ export default function App() {
         prevCustomers={uniqueCustomers(priorPeriod)}
         quantity={sumQty(thisWeek)}
         invoices={uniqueInvoices(thisWeek)}
+        weekAsp={weekAsp}
+        mtdAsp={mtdAsp}
         mtdRevenue={mtdRevenue}
         monthTarget={monthTarget}
         monthLabel={monthKey}
@@ -419,14 +430,13 @@ export default function App() {
         reviewMonthLabel={formatMonthLabel(monthKey)}
         mtdWorkingDays={workingDays.elapsed}
         monthWorkingDays={workingDays.total}
-        workingDaysThrough={review ? review.throughDate.slice(5) : '—'}
+        workingDaysThrough={workingDays.through ? workingDays.through.slice(5) : '—'}
         holidaysLoaded={workingDays.holidaysLoaded}
       />
 
       {selectedRange && monthForecast ? (
         <ForecastPanel
           monthLabel={formatMonthLabel(monthKey)}
-          throughLabel={review ? review.throughDate.slice(5) : selectedRange.end.slice(5)}
           targetLabel={pacedTarget.label}
           scopeNote={forecastScopeNote(filters)}
           result={monthForecast}
@@ -446,6 +456,12 @@ export default function App() {
         modelStacks={modelStacks}
         mtdThroughLabel={mtdThrough ? mtdThrough.slice(5) : null}
         salesperson={filters.salesperson}
+        teamMtdAsp={mtdAsp}
+        mtdAspByRep={
+          new Map(
+            groupBy(mtd, (row) => row.salesperson || 'Unassigned').map((row) => [row.name, row.asp]),
+          )
+        }
       />
 
       <RepBoard rows={bySp} invoiceCounts={weekInvoices} />

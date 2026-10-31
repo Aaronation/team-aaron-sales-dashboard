@@ -1,8 +1,8 @@
 /// <reference types="node" />
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_SPLITS, teamTargetForMonth } from './aggregates'
-import { isWorkingDay } from './hkHolidays'
+import { DEFAULT_SPLITS, reviewWindow, teamTargetForMonth } from './aggregates'
+import { isWorkingDay, mtdWorkingDays } from './hkHolidays'
 import {
   describePace,
   describeRunRate,
@@ -101,6 +101,7 @@ describe('working-day pace and forecast', () => {
     const result = forecastForReview({
       monthKey: '2026-10',
       throughDate: through,
+      entryDates: [through],
       mtdRevenue: mtd,
       target: 3_300_000,
     })
@@ -111,17 +112,104 @@ describe('working-day pace and forecast', () => {
     expect(result.expectedMtd).toBe(1_815_000)
     expect(result.forecast).toBeCloseTo((mtd / 11) * 20, 6)
     expect(describePace(result)).toBe('HK$725,442 is below the straight-line HK$1,815,000.')
+    expect(result.elapsedThrough).toBe('2026-10-18')
     expect(describeRunRate(result, '10-18')).toBe('Working-day run-rate through 10-18 × 20 working days.')
     expect(shareOfTargetLabel(result.mtdRevenue, result.target)).toBe('22.0% of target')
   })
 
+  it('caps elapsed days at the latest entry in the review month', () => {
+    const payload = JSON.parse(readFileSync('public/data/sales-line-items.json', 'utf8')) as {
+      lineItems: { date: string | null; totalAmount: number }[]
+    }
+    const entryDates = payload.lineItems.map((row) => row.date)
+    const through = '2026-10-18'
+    const mtd = payload.lineItems
+      .filter((row) => row.date != null && row.date >= '2026-10-01' && row.date <= through)
+      .reduce((sum, row) => sum + row.totalAmount, 0)
+
+    const seeded = forecastForReview({
+      monthKey: '2026-10',
+      throughDate: through,
+      entryDates,
+      mtdRevenue: mtd,
+      target: 3_300_000,
+    })
+    expect(seeded.elapsedThrough).toBe('2026-10-12')
+    expect(seeded.elapsedWorkingDays).toBe(7)
+    expect(seeded.totalWorkingDays).toBe(20)
+    expect(seeded.expectedMtd).toBe(1_155_000)
+    expect(seeded.forecast).toBeCloseTo((mtd / 7) * 20, 6)
+    expect(seeded.pace).toBe('behind')
+    expect(describePace(seeded)).toBe('HK$725,442 is below the straight-line HK$1,155,000.')
+    expect(describeRunRate(seeded, '10-12')).toBe('Working-day run-rate through 10-12 × 20 working days.')
+
+    const week = reviewWindow('2026-W44')
+    expect(week?.throughDate).toBe('2026-10-31')
+    const octoberEntries = ['2026-10-13', '2026-10-27', '2026-11-01', null]
+    const days = mtdWorkingDays('2026-10', week!.throughDate, octoberEntries)
+    expect(days).toEqual({
+      elapsed: 17,
+      total: 20,
+      holidaysLoaded: true,
+      through: '2026-10-27',
+    })
+    const w44 = forecastForReview({
+      monthKey: '2026-10',
+      throughDate: week!.throughDate,
+      entryDates: octoberEntries,
+      mtdRevenue: 1_700,
+      target: 2_000,
+    })
+    expect(w44.elapsedWorkingDays).toBe(17)
+    expect(w44.totalWorkingDays).toBe(20)
+    expect(w44.elapsedThrough).toBe(days.through)
+    expect(w44.expectedMtd).toBe((2_000 * 17) / 20)
+    expect(w44.forecast).toBe((1_700 / 17) * 20)
+    expect(describeRunRate(w44, '10-27')).toBe('Working-day run-rate through 10-27 × 20 working days.')
+  })
+
+  it('keeps the week ceiling when a later entry exists, and skips days with no entries', () => {
+    const pastTheWeek = mtdWorkingDays('2026-10', '2026-10-18', ['2026-10-12', '2026-10-27'])
+    expect(pastTheWeek.through).toBe('2026-10-18')
+    expect(pastTheWeek.elapsed).toBe(11)
+    expect(pastTheWeek.total).toBe(20)
+
+    const empty = mtdWorkingDays('2026-10', '2026-10-31', [])
+    expect(empty).toMatchObject({ elapsed: 0, total: 20, through: null })
+    const otherMonth = forecastForReview({
+      monthKey: '2026-10',
+      throughDate: '2026-10-31',
+      entryDates: ['2026-11-02'],
+      mtdRevenue: 0,
+      target: 100,
+    })
+    expect(otherMonth.elapsedWorkingDays).toBe(0)
+    expect(otherMonth.elapsedThrough).toBeNull()
+    expect(otherMonth.forecast).toBeNull()
+    expect(otherMonth.pace).toBeNull()
+    expect(otherMonth.totalWorkingDays).toBe(20)
+  })
+
+  it('counts working days through a weekend entry date without counting that day', () => {
+    const saturday = mtdWorkingDays('2026-10', '2026-10-31', ['2026-10-10'])
+    const friday = mtdWorkingDays('2026-10', '2026-10-31', ['2026-10-09'])
+    expect(saturday.through).toBe('2026-10-10')
+    expect(friday.through).toBe('2026-10-09')
+    expect(saturday.elapsed).toBe(6)
+    expect(saturday.elapsed).toBe(friday.elapsed)
+    expect(saturday.total).toBe(20)
+  })
+
   it('projects the sample November rows through the review week', () => {
+    const entryDates = ['2026-11-02', '2026-11-04', '2026-11-06', '2026-11-09', '2026-11-12']
     const throughWeek = forecastForReview({
       monthKey: '2026-11',
       throughDate: '2026-11-08',
+      entryDates,
       mtdRevenue: 24_000,
       target: 3_200_000,
     })
+    expect(throughWeek.elapsedThrough).toBe('2026-11-08')
     expect(throughWeek.elapsedWorkingDays).toBe(5)
     expect(throughWeek.totalWorkingDays).toBe(21)
     expect(throughWeek.pace).toBe('behind')
@@ -132,12 +220,15 @@ describe('working-day pace and forecast', () => {
     const throughReplace = forecastForReview({
       monthKey: '2026-11',
       throughDate: '2026-11-15',
+      entryDates,
       mtdRevenue: 30_000,
       target: 3_200_000,
     })
-    expect(throughReplace.elapsedWorkingDays).toBe(10)
-    expect(throughReplace.forecast).toBe(63_000)
-    expect(describePace(throughReplace)).toBe('HK$30,000 is below the straight-line HK$1,523,810.')
+    expect(throughReplace.elapsedThrough).toBe('2026-11-12')
+    expect(throughReplace.elapsedWorkingDays).toBe(9)
+    expect(throughReplace.totalWorkingDays).toBe(21)
+    expect(throughReplace.forecast).toBe(70_000)
+    expect(describePace(throughReplace)).toBe('HK$30,000 is below the straight-line HK$1,371,429.')
     expect(shareOfTargetLabel(30_000, 3_200_000)).toBe('0.9% of target')
   })
 
@@ -145,10 +236,12 @@ describe('working-day pace and forecast', () => {
     const result = forecastForReview({
       monthKey: '2027-10',
       throughDate: '2027-10-04',
+      entryDates: ['2027-10-04'],
       mtdRevenue: 100,
       target: 1_000,
     })
     expect(result.holidaysLoaded).toBe(false)
+    expect(result.elapsedThrough).toBe('2027-10-04')
     expect(result.elapsedWorkingDays).toBe(2)
   })
 })

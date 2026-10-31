@@ -47,6 +47,7 @@ python3 scripts/extract-xlsx.py \
 5. Refresh the page. November, the import note, and the review week you picked are still there. The footer still names `sample-kingdee-import.csv`.
 6. With review week `2026-W45`, **Targets and forecast** shows Nov 2026 MTD `HK$24,000`, pace **Behind**, and forecast `HK$100,800`.
 7. **Replace all** with the same file leaves only those five rows. **Reset to seed** clears the browser save and restores the bundled JSON. A second refresh stays on the seed.
+8. To refresh a revised invoice, stay on **Merge into current** and upload an export that includes that invoice number. That invoice’s lines become the file’s lines (qty, price, date, items, or removals). Invoices missing from the file stay. Importing the same file again does not double-count. You do not need Replace or Reset for a revision.
 
 You can also upload your own `.csv`, `.xlsx`, or dashboard `.json`. Legacy `.xls` is not accepted — export `.xlsx` or CSV from Kingdee. Merge and Replace are saved in this browser (IndexedDB). Refresh keeps that working set, including the review week, until **Reset to seed**. The seed file on disk is not rewritten.
 
@@ -68,7 +69,7 @@ Ambiguous numeric dates (`06/11/2026`) are read as day/month/year.
 | Product model | no | 产品型号, 规格型号, Product Model |
 | Product name | no | Product Name, 物料名称, 商品名称 |
 
-A title block above the header row is skipped. Rows labeled 合计 / Total are skipped. **Merge** adds new lines and replaces a line when invoice, SKU, date, quantity, amount, and customer all match. **Replace** swaps the working set and keeps the team targets from the seed.
+A title block above the header row is skipped. Rows labeled 合计 / Total are skipped. **Merge** replaces each invoice number in the file with that file’s lines (revised qty, price, date, items, or removals) and keeps invoices the file does not mention. Identical lines inside an invoice are still deduped. **Replace** swaps the working set and keeps the team targets from the seed.
 
 CSV may be UTF-8 or GB18030. Excel workbooks use the sheet named `Data` when several sheets match.
 
@@ -78,10 +79,10 @@ Under the weekly scorecard, **Targets and forecast** shows the review month:
 
 - **Team target** for the month (or that rep’s split when a salesperson is selected).
 - **MTD sell-out** through the end of the review week.
-- **Pace** — On track when MTD is at or above a straight line from zero to the target across Hong Kong working days; Behind when it is below. Weekends and gazetted HK holidays are excluded.
-- **Forecast** — MTD divided by elapsed working days, times the working days in the month.
+- **Pace** — On track when MTD is at or above a straight line from zero to the target across Hong Kong working days; Behind when it is below. Weekends and gazetted HK holidays are excluded. Elapsed days stop at the latest entry in the review month, and do not run past the review week.
+- **Forecast** — MTD divided by those elapsed working days, times the working days in the month.
 
-October 2026 on the seeded week `2026-W42` is behind: MTD `HK$725,442` against a straight-line `HK$1,815,000`, forecast `HK$1,318,985`.
+October 2026 on the seeded week `2026-W42` is behind: MTD `HK$725,442` against a straight-line `HK$1,155,000`, forecast `HK$2,072,690`. The latest October entry is `2026-10-12`, so the month is 7 of 20 working days.
 
 ## Stack
 

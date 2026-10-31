@@ -253,10 +253,10 @@ describe('review week that ends in the next month', () => {
       throughDate: '2026-10-18',
     })
 
-    const days = mtdWorkingDays('2026-10', window!.throughDate)
-    expect(days.elapsed).toBe(20)
-    expect(days.total).toBe(20)
-    expect(mtdWorkingDays('2026-11', '2026-11-01').elapsed).toBe(0)
+    const covered = mtdWorkingDays('2026-10', window!.throughDate, [window!.throughDate])
+    expect(covered.elapsed).toBe(20)
+    expect(covered.total).toBe(20)
+    expect(mtdWorkingDays('2026-11', '2026-11-01', ['2026-11-01']).elapsed).toBe(0)
 
     const items = [
       line('2026-10-13', 400, { invoice: 'early' }),
@@ -271,7 +271,19 @@ describe('review week that ends in the next month', () => {
     const throughW43 = filterMtdThroughWeek(items, { ...filters, weekKey: '2026-W43' }, '2026-W43')
     expect(throughW43.map((row) => row.invoice)).toEqual(['early', 'mid'])
     expect(sumRevenue(throughW43)).toBe(1200)
-    expect(mtdWorkingDays('2026-10', '2026-10-25').elapsed).toBe(15)
+    const throughW43Days = mtdWorkingDays(
+      '2026-10',
+      '2026-10-25',
+      items.map((row) => row.date),
+    )
+    expect(throughW43Days.elapsed).toBe(15)
+    expect(throughW43Days.through).toBe('2026-10-25')
+    const throughW44Days = mtdWorkingDays(
+      '2026-10',
+      window!.throughDate,
+      items.map((row) => row.date),
+    )
+    expect(throughW44Days).toMatchObject({ elapsed: 17, total: 20, through: '2026-10-27' })
 
     const october = customerWorkingDayMom(throughW44, '2026-10', '2026-10-31')
     expect(october.bars.map((bar) => bar.name)).toEqual(['Wonderland', 'Vision', 'ADDL'])
@@ -279,7 +291,7 @@ describe('review week that ends in the next month', () => {
     expect(modelRepStacks(throughW44, '2026-10', '2026-10-31').bars.length).toBeGreaterThan(0)
   })
 
-  it('leaves the seeded W42 October MTD on 11 working days', () => {
+  it('caps seeded W42 elapsed days at the latest October entry', () => {
     const payload = JSON.parse(readFileSync('public/data/sales-line-items.json', 'utf8')) as SalesPayload
     const window = reviewWindow('2026-W42')
     expect(window?.throughDate).toBe('2026-10-18')
@@ -288,7 +300,13 @@ describe('review week that ends in the next month', () => {
       { weekKey: '2026-W42', salesperson: 'all', department: 'all', query: '' },
       '2026-W42',
     )
-    expect(mtdWorkingDays('2026-10', window!.throughDate).elapsed).toBe(11)
+    expect(
+      mtdWorkingDays(
+        '2026-10',
+        window!.throughDate,
+        payload.lineItems.map((row) => row.date),
+      ),
+    ).toMatchObject({ elapsed: 7, total: 20, through: '2026-10-12' })
     expect(Math.round(sumRevenue(rows))).toBe(725442)
   })
 })
