@@ -366,6 +366,13 @@ export default function App() {
     <div className="shell">
       <header className="hero">
         <div className="hero__brand">
+          <img
+            className="hero__logo"
+            src="/brand/momax-logo-black.svg"
+            alt="Momax"
+            width={201}
+            height={32}
+          />
           <p className="hero__eyebrow">Team Aaron · Galaxy / KA</p>
           <h1>Weekly manager review</h1>
           <p className="hero__lede">
