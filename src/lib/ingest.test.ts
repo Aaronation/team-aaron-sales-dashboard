@@ -4,12 +4,14 @@
  * Monthly customer charts then group on `customer` (see groupBy in App.tsx).
  *
  * Merge applies the wGAL map in partnerAliases before that grouping.
+ * Merge then replaces every invoice number present in the file and keeps the rest.
  * Replace swaps the working set for the ingested rows and does not rematch.
  */
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { filterItems, groupBy, isoWeekKey, listWeekKeys, sumRevenue } from './aggregates'
 import { reconcileFilters } from './filters'
-import { ingestRecords, mergeImportedItems, recordsFromMatrix } from './ingest'
+import { ingestRecords, lineKey, mergeImportedItems, recordsFromMatrix } from './ingest'
 import { WGAL_PARTNER_ALIASES } from './partnerAliases'
 import type { LineItem } from './types'
 
@@ -138,6 +140,387 @@ describe('customer name rematch on merge', () => {
 
     const merged = mergeImportedItems([], incoming, 'merge')
     expect(merged.lineItems[0]?.customer).toBe('Vision')
+  })
+})
+
+describe('invoice-aware merge', () => {
+  const shop39 = 'Lancer 領先 Shop39'
+  const shop11 = 'Lancer 領先 Shop11'
+
+  it('replaces revised qty, price, and date on the same invoice', () => {
+    const current = [
+      lineItem({
+        invoice: 'SI26100020',
+        date: '2026-10-02',
+        sku: 'UD31Q22UKR',
+        quantity: 10,
+        unitPrice: 132,
+        totalAmount: 1320,
+        customer: 'Lancer',
+        tradingPartner: shop39,
+        salesperson: 'Kelvin Lai',
+      }),
+    ]
+    const incoming = [
+      lineItem({
+        invoice: 'SI26100020',
+        date: '2026-10-06',
+        sku: 'UD31Q22UKR',
+        quantity: 4,
+        unitPrice: 200,
+        totalAmount: 800,
+        customer: 'Lancer',
+        tradingPartner: shop39,
+        salesperson: 'Kelvin Lai',
+        source: 'import',
+      }),
+    ]
+
+    const merged = mergeImportedItems(current, incoming, 'merge')
+
+    expect(merged.added).toBe(0)
+    expect(merged.replaced).toBe(1)
+    expect(merged.lineItems).toHaveLength(1)
+    expect(merged.lineItems[0]).toMatchObject({
+      date: '2026-10-06',
+      quantity: 4,
+      unitPrice: 200,
+      totalAmount: 800,
+    })
+    expect(sumRevenue(merged.lineItems)).toBe(sumRevenue(incoming))
+    expect(sumRevenue(merged.lineItems)).toBe(800)
+  })
+
+  it('drops a line the revised invoice no longer includes', () => {
+    const current = [
+      lineItem({
+        invoice: 'SI26100020',
+        date: '2026-10-02',
+        sku: 'UD31Q22UKR',
+        quantity: 10,
+        unitPrice: 132,
+        totalAmount: 1320,
+        customer: 'Lancer',
+        tradingPartner: shop39,
+        salesperson: 'Kelvin Lai',
+      }),
+      lineItem({
+        invoice: 'SI26100020',
+        date: '2026-10-02',
+        sku: 'TP11W',
+        quantity: 1,
+        unitPrice: 1722,
+        totalAmount: 1722,
+        customer: 'Lancer',
+        tradingPartner: shop39,
+        salesperson: 'Kelvin Lai',
+      }),
+    ]
+    const incoming = [
+      lineItem({
+        invoice: 'SI26100020',
+        date: '2026-10-02',
+        sku: 'UD31Q22UKR',
+        quantity: 10,
+        unitPrice: 132,
+        totalAmount: 1320,
+        customer: 'Lancer',
+        tradingPartner: shop39,
+        salesperson: 'Kelvin Lai',
+        source: 'import',
+      }),
+    ]
+
+    const merged = mergeImportedItems(current, incoming, 'merge')
+    const revised = merged.lineItems.filter((row) => row.invoice === 'SI26100020')
+
+    expect(revised.map((row) => row.sku)).toEqual(['UD31Q22UKR'])
+    expect(sumRevenue(revised)).toBe(1320)
+    expect(sumRevenue(revised)).toBe(sumRevenue(incoming))
+    expect(merged.added).toBe(0)
+    expect(merged.replaced).toBe(1)
+  })
+
+  it('keeps an invoice the file does not mention', () => {
+    const kept = lineItem({
+      invoice: 'SI-KEEP',
+      date: '2026-09-30',
+      sku: 'KEEP-SKU',
+      totalAmount: 500,
+      customer: 'Vision',
+    })
+    const current = [
+      kept,
+      lineItem({
+        invoice: 'SI26100020',
+        date: '2026-10-02',
+        sku: 'OLD',
+        totalAmount: 3042,
+        customer: 'Lancer',
+        tradingPartner: shop39,
+        salesperson: 'Kelvin Lai',
+      }),
+    ]
+    const incoming = [
+      lineItem({
+        invoice: 'SI26100020',
+        date: '2026-10-02',
+        sku: 'NEW',
+        totalAmount: 900,
+        customer: 'Lancer',
+        tradingPartner: shop11,
+        salesperson: 'Kelvin Lai',
+        source: 'import',
+      }),
+    ]
+
+    const merged = mergeImportedItems(current, incoming, 'merge')
+
+    expect(merged.lineItems.find((row) => row.invoice === 'SI-KEEP')).toMatchObject({
+      totalAmount: 500,
+      customer: 'Vision',
+      sku: 'KEEP-SKU',
+    })
+    expect(sumRevenue(merged.lineItems.filter((row) => row.invoice === 'SI26100020'))).toBe(900)
+  })
+
+  it('adds an invoice that is only in the file', () => {
+    const current = [
+      lineItem({
+        invoice: 'SI-KEEP',
+        date: '2026-09-30',
+        totalAmount: 500,
+        customer: 'Vision',
+      }),
+    ]
+    const incoming = [
+      lineItem({
+        invoice: 'SI-NEW',
+        date: '2026-10-04',
+        sku: 'NEW-SKU',
+        totalAmount: 200,
+        customer: 'Lancer',
+        salesperson: 'Kelvin Lai',
+        source: 'import',
+      }),
+    ]
+
+    const merged = mergeImportedItems(current, incoming, 'merge')
+
+    expect(merged.added).toBe(1)
+    expect(merged.replaced).toBe(0)
+    expect(merged.lineItems.map((row) => row.invoice)).toEqual(['SI-KEEP', 'SI-NEW'])
+    expect(sumRevenue(merged.lineItems)).toBe(700)
+  })
+
+  it('stays stable when the same invoice snapshot is merged again', () => {
+    const current = [
+      lineItem({
+        invoice: 'SI26100020',
+        date: '2026-10-02',
+        sku: 'OLD',
+        quantity: 9,
+        totalAmount: 3042,
+        customer: 'Lancer',
+        tradingPartner: shop39,
+        salesperson: 'Kelvin Lai',
+      }),
+      lineItem({
+        invoice: 'SI-KEEP',
+        date: '2026-09-30',
+        totalAmount: 500,
+        customer: 'Vision',
+      }),
+    ]
+    const incoming = [
+      lineItem({
+        invoice: 'SI26100020',
+        date: '2026-10-02',
+        sku: 'UD31-REV',
+        quantity: 2,
+        unitPrice: 500,
+        totalAmount: 1000,
+        customer: shop11,
+        tradingPartner: shop11,
+        salesperson: 'Kelvin Lai',
+        source: 'import',
+      }),
+      lineItem({
+        invoice: 'SI-NEW',
+        date: '2026-10-02',
+        sku: 'NEW-SKU',
+        quantity: 1,
+        totalAmount: 500,
+        customer: shop11,
+        tradingPartner: shop11,
+        salesperson: 'Kelvin Lai',
+        source: 'import',
+      }),
+    ]
+
+    const first = mergeImportedItems(current, incoming, 'merge')
+    const second = mergeImportedItems(first.lineItems, incoming, 'merge')
+
+    expect(first.lineItems.find((row) => row.sku === 'OLD')).toBeUndefined()
+    expect(first.lineItems.filter((row) => row.invoice === 'SI26100020')).toMatchObject([
+      { sku: 'UD31-REV', totalAmount: 1000, quantity: 2, customer: 'Lancer' },
+    ])
+    expect(sumRevenue(first.lineItems.filter((row) => row.invoice === 'SI26100020'))).toBe(1000)
+    expect(second.added).toBe(0)
+    expect(second.replaced).toBe(2)
+    expect(second.lineItems).toHaveLength(first.lineItems.length)
+    expect(sumRevenue(second.lineItems)).toBe(sumRevenue(first.lineItems))
+    expect(second.lineItems.map((row) => row.invoice)).toEqual(first.lineItems.map((row) => row.invoice))
+    expect(second.lineItems.find((row) => row.invoice === 'SI-KEEP')?.totalAmount).toBe(500)
+  })
+
+  it('rematches a Lancer shop while replacing the invoice snapshot', () => {
+    const current = [
+      lineItem({
+        invoice: 'SI26100020',
+        date: '2026-10-02',
+        sku: 'UD31Q22UKR',
+        totalAmount: 3042,
+        customer: shop39,
+        tradingPartner: shop39,
+        salesperson: 'Kelvin Lai',
+      }),
+      lineItem({
+        invoice: 'SI-KEEP',
+        date: '2026-09-15',
+        totalAmount: 420,
+        customer: 'Vision',
+      }),
+    ]
+    const incoming = ingestSheet([
+      ['单据编号', '单据日期', '往来单位', '销售员', '物料编码', '数量', '价税合计'],
+      ['SI26100020', '2026-10-02', shop11, 'Kelvin Lai', 'UD31-REV', 2, 1000],
+      ['SI-NEW', '2026-10-04', shop11, 'Kelvin Lai', 'NEW-SKU', 1, 250],
+    ])
+    expect(incoming.map((row) => row.customer)).toEqual([shop11, shop11])
+
+    const merged = mergeImportedItems(current, incoming, 'merge')
+
+    expect(merged.lineItems.filter((row) => row.invoice === 'SI26100020')).toMatchObject([
+      { customer: 'Lancer', sku: 'UD31-REV', totalAmount: 1000, quantity: 2 },
+    ])
+    expect(merged.lineItems.find((row) => row.invoice === 'SI-NEW')).toMatchObject({
+      customer: 'Lancer',
+      totalAmount: 250,
+    })
+    expect(merged.lineItems.find((row) => row.invoice === 'SI-KEEP')?.totalAmount).toBe(420)
+    expect(sumRevenue(merged.lineItems.filter((row) => row.invoice === 'SI26100020'))).toBe(1000)
+    expect(sumRevenue(merged.lineItems)).toBe(1670)
+  })
+
+  it('keeps an explicit customer name when replacing an invoice', () => {
+    const current = [
+      lineItem({
+        invoice: 'SI26100020',
+        date: '2026-10-02',
+        sku: 'OLD',
+        totalAmount: 3042,
+        customer: 'Lancer',
+        tradingPartner: shop39,
+      }),
+    ]
+    const incoming = ingestSheet([
+      ['单据编号', '单据日期', '往来单位', '客户', '销售员', '物料编码', '数量', '价税合计'],
+      ['SI26100020', '2026-10-02', shop11, 'Harbour Retail', 'Kelvin Lai', 'NEW', 1, 900],
+    ])
+
+    const merged = mergeImportedItems(current, incoming, 'merge')
+
+    expect(merged.lineItems).toHaveLength(1)
+    expect(merged.lineItems[0]).toMatchObject({
+      customer: 'Harbour Retail',
+      tradingPartner: shop11,
+      sku: 'NEW',
+      totalAmount: 900,
+    })
+  })
+
+  it('does not double-count identical lines inside one invoice', () => {
+    const line = lineItem({
+      invoice: 'SI-1',
+      date: '2026-10-02',
+      sku: 'A',
+      quantity: 2,
+      totalAmount: 40,
+      customer: 'Vision',
+    })
+    const merged = mergeImportedItems(
+      [lineItem({ invoice: 'SI-KEEP', date: '2026-10-01', totalAmount: 10, customer: 'ADDL' })],
+      [line, { ...line }],
+      'merge',
+    )
+    const invoice = merged.lineItems.filter((row) => row.invoice === 'SI-1')
+
+    expect(invoice).toHaveLength(1)
+    expect(sumRevenue(invoice)).toBe(40)
+    expect(merged.added).toBe(1)
+    expect(merged.lineItems).toHaveLength(2)
+  })
+
+  it('replaces bundled seed invoice SI26100020 and keeps a neighbor invoice', () => {
+    const seed = JSON.parse(
+      readFileSync(new URL('../../public/data/sales-line-items.json', import.meta.url), 'utf8'),
+    ) as { lineItems: LineItem[] }
+    const before = seed.lineItems.filter((row) => row.invoice === 'SI26100020')
+    const neighbor = seed.lineItems.filter((row) => row.invoice === 'SI26100055')
+    expect(before).toHaveLength(9)
+    expect(sumRevenue(before)).toBe(3042)
+    expect(new Set(before.map((row) => lineKey(row))).size).toBe(before.length)
+
+    const incoming = ingestSheet([
+      ['单据编号', '单据日期', '往来单位', '销售员', '物料编码', '数量', '价税合计'],
+      ['SI26100020', '2026-10-02', shop11, 'Kelvin Lai', 'UD31-REV', 2, 1000],
+      ['SI-NEW-AWARE', '2026-10-02', shop11, 'Kelvin Lai', 'NEW-SKU', 1, 500],
+    ])
+    const uniqueBefore = new Set(seed.lineItems.map((row) => lineKey(row))).size
+    const first = mergeImportedItems(seed.lineItems, incoming, 'merge')
+
+    expect(first.added).toBe(1)
+    expect(first.replaced).toBe(1)
+    expect(first.lineItems).toHaveLength(uniqueBefore - before.length + incoming.length)
+    expect(first.lineItems.filter((row) => row.invoice === 'SI26100020')).toMatchObject([
+      { customer: 'Lancer', sku: 'UD31-REV', quantity: 2, totalAmount: 1000 },
+    ])
+    expect(sumRevenue(first.lineItems.filter((row) => row.invoice === 'SI-NEW-AWARE'))).toBe(500)
+    expect(sumRevenue(first.lineItems.filter((row) => row.invoice === 'SI26100055'))).toBe(
+      sumRevenue(neighbor),
+    )
+    expect(first.lineItems.filter((row) => row.invoice === 'SI26100055')).toHaveLength(neighbor.length)
+
+    const second = mergeImportedItems(first.lineItems, incoming, 'merge')
+    expect(second.added).toBe(0)
+    expect(second.replaced).toBe(2)
+    expect(second.lineItems).toHaveLength(first.lineItems.length)
+    expect(sumRevenue(second.lineItems.filter((row) => row.invoice === 'SI26100020'))).toBe(1000)
+  })
+
+  it('does not wipe other rows that have no invoice number', () => {
+    const current = [
+      lineItem({ invoice: '', date: '2026-10-01', sku: 'A', totalAmount: 10, customer: 'ADDL' }),
+      lineItem({ invoice: '', date: '2026-10-02', sku: 'B', totalAmount: 20, customer: 'Vision' }),
+    ]
+    const incoming = [
+      lineItem({
+        invoice: '',
+        date: '2026-10-03',
+        sku: 'C',
+        totalAmount: 30,
+        customer: 'Harbour',
+        source: 'import',
+      }),
+    ]
+
+    const merged = mergeImportedItems(current, incoming, 'merge')
+
+    expect(merged.lineItems).toHaveLength(3)
+    expect(sumRevenue(merged.lineItems)).toBe(60)
+    expect(merged.added).toBe(1)
+    expect(merged.replaced).toBe(0)
   })
 })
 

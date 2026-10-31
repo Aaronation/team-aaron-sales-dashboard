@@ -13,6 +13,8 @@ import {
   YAxis,
 } from 'recharts'
 import {
+  averageSellingPrice,
+  formatAsp,
   formatMoney,
   formatMonthLabel,
   MONTHLY_TEAM_TARGETS,
@@ -139,6 +141,8 @@ type Props = {
   modelStacks: { series: StackSeries[]; bars: StackBar[] }
   mtdThroughLabel: string | null
   salesperson: string
+  teamMtdAsp: number | null
+  mtdAspByRep: ReadonlyMap<string, number | null>
 }
 
 function formatAchieve(achieve: number | null): string {
@@ -159,6 +163,8 @@ export function MonthlySales({
   modelStacks,
   mtdThroughLabel,
   salesperson,
+  teamMtdAsp,
+  mtdAspByRep,
 }: Props) {
   const chartRows = months.map((month) => ({
     ...month,
@@ -172,6 +178,8 @@ export function MonthlySales({
     }),
     { revenue: 0, quantity: 0, invoices: 0 },
   )
+  const grandAsp = averageSellingPrice(grand.revenue, grand.quantity)
+  const aspHeader = salesperson === 'all' ? 'ASP' : `${shortName(salesperson)} ASP`
   const repLabel = salesperson === 'all' ? null : shortName(salesperson)
   const pieRows = shares
     .filter((share) => share.revenue > 0)
@@ -500,13 +508,14 @@ export function MonthlySales({
         )}
       </figure>
 
-      <div className="table-scroll">
+      <div className="table-scroll monthly-metrics">
         <table className="monthly-table">
           <thead>
             <tr>
               <th>Month</th>
               <th>Sales (HKD)</th>
               <th>Qty</th>
+              <th>{aspHeader}</th>
               <th>Invoices</th>
               <th>Customers</th>
               {showTarget ? <th>Team target</th> : null}
@@ -524,6 +533,7 @@ export function MonthlySales({
                   </td>
                   <td>{formatMoney(month.revenue)}</td>
                   <td>{Math.round(month.quantity).toLocaleString()}</td>
+                  <td>{formatAsp(month.asp)}</td>
                   <td>{month.invoices.toLocaleString()}</td>
                   <td>{month.customers.toLocaleString()}</td>
                   {showTarget ? (
@@ -543,6 +553,7 @@ export function MonthlySales({
                 <th>All months</th>
                 <td>{formatMoney(grand.revenue)}</td>
                 <td>{Math.round(grand.quantity).toLocaleString()}</td>
+                <td>{formatAsp(grandAsp)}</td>
                 <td>{grand.invoices.toLocaleString()}</td>
                 <td />
                 {showTarget ? <td /> : null}
@@ -552,7 +563,13 @@ export function MonthlySales({
         </table>
       </div>
 
-      <RepTargets rows={repRows} activeMonthKey={activeMonthKey} />
+      <RepTargets
+        rows={repRows}
+        activeMonthKey={activeMonthKey}
+        mtdThroughLabel={mtdThroughLabel}
+        teamMtdAsp={teamMtdAsp}
+        mtdAspByRep={mtdAspByRep}
+      />
     </section>
   )
 }
@@ -560,9 +577,15 @@ export function MonthlySales({
 function RepTargets({
   rows,
   activeMonthKey,
+  mtdThroughLabel,
+  teamMtdAsp,
+  mtdAspByRep,
 }: {
   rows: RepAchievement[]
   activeMonthKey: string | null
+  mtdThroughLabel: string | null
+  teamMtdAsp: number | null
+  mtdAspByRep: ReadonlyMap<string, number | null>
 }) {
   if (rows.length === 0 || rows.every((row) => row.months.length === 0)) return null
   const monthColumns = rows[0]?.months ?? []
@@ -581,12 +604,18 @@ function RepTargets({
         Targets are the team month target × split: Aaron 49%, Kelvin 31%, Kenny 20%.
         Achieve rate is that rep’s month sell-out divided by their target. Reps without a split,
         including Unassigned, show sell-out against —. The salesperson filter does not hide other
-        reps. Targets are team-level and are not resized by the department filter.
+        reps. Targets are team-level and are not resized by the department filter. MTD ASP uses the
+        review filters and the same MTD cutoff as the scorecard. A selected salesperson leaves the
+        other reps’ ASP as —.
       </p>
 
       {reviewRows.length > 0 ? (
         <div className="rep-targets__block">
           <h4>{reviewLabel} · review month</h4>
+          <p className="monthly__caption">
+            Team MTD ASP through {mtdThroughLabel ?? '—'} is {formatAsp(teamMtdAsp)}. ASP is
+            tax-inclusive sell-out divided by units.
+          </p>
           <div className="table-scroll">
             <table className="monthly-table">
               <thead>
@@ -595,6 +624,7 @@ function RepTargets({
                   <th>Sell-out (HKD)</th>
                   <th>Target</th>
                   <th>Achieve</th>
+                  <th>MTD ASP</th>
                 </tr>
               </thead>
               <tbody>
@@ -611,6 +641,7 @@ function RepTargets({
                         </span>
                       ) : null}
                     </td>
+                    <td className="mono">{formatAsp(mtdAspByRep.get(row.name) ?? null)}</td>
                   </tr>
                 ))}
               </tbody>

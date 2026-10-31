@@ -71,20 +71,44 @@ export function countWorkingDays(start: string, end: string): number {
   return eachDate(start, end).filter(isWorkingDay).length
 }
 
+export type MtdWorkingDays = {
+  elapsed: number
+  total: number
+  holidaysLoaded: boolean
+  /**
+   * Calendar date elapsed days are counted through.
+   * Null when the review month has no entries.
+   */
+  through: string | null
+}
+
 /**
  * MTD working days for a review month.
- * `throughDate` is the same cutoff as MTD revenue: the end of the selected review week.
+ *
+ * `throughDate` is the existing MTD ceiling: the end of the selected review week,
+ * clamped to the month. Elapsed days stop at the latest entry date in that month
+ * when that date is earlier, so a week that runs past the imported book does not
+ * count days with no entries. The total stays every working day in the month.
+ * No entries in the month means nothing has elapsed.
  */
 export function mtdWorkingDays(
   monthKey: string,
   throughDate: string,
-): { elapsed: number; total: number; holidaysLoaded: boolean } {
+  entryDates: readonly (string | null | undefined)[],
+): MtdWorkingDays {
   const start = `${monthKey}-01`
   const end = monthEnd(monthKey)
-  const through = throughDate < start ? start : throughDate > end ? end : throughDate
+  const weekThrough = throughDate < start ? start : throughDate > end ? end : throughDate
+  let latest: string | null = null
+  for (const date of entryDates) {
+    if (!date || date < start || date > end) continue
+    if (latest == null || date > latest) latest = date
+  }
+  const through = latest == null ? null : latest < weekThrough ? latest : weekThrough
   return {
-    elapsed: countWorkingDays(start, through),
+    elapsed: through == null ? 0 : countWorkingDays(start, through),
     total: countWorkingDays(start, end),
     holidaysLoaded: hkHolidaysLoaded(monthKey.slice(0, 4)),
+    through,
   }
 }

@@ -1,4 +1,4 @@
-import { formatMoney, formatPct } from '../lib/aggregates'
+import { formatAsp, formatMoney, formatPct } from '../lib/aggregates'
 
 type Props = {
   weekLabel: string
@@ -19,6 +19,8 @@ type Props = {
   monthWorkingDays: number
   workingDaysThrough: string
   holidaysLoaded: boolean
+  weekAsp: number | null
+  mtdAsp: number | null
 }
 
 function Delta({ value }: { value: number | null }) {
@@ -46,6 +48,8 @@ export function KpiRow({
   monthWorkingDays,
   workingDaysThrough,
   holidaysLoaded,
+  weekAsp,
+  mtdAsp,
 }: Props) {
   const mtdPct = monthTarget > 0 ? mtdRevenue / monthTarget : 0
   const custDelta =
@@ -60,6 +64,7 @@ export function KpiRow({
           vs same period last month ({priorPeriodLabel ?? '—'}) {formatMoney(prevRevenue)}{' '}
           <Delta value={delta} />
         </p>
+        <p className="kpis__hint">Week ASP {formatAsp(weekAsp)}</p>
       </div>
       <div>
         <p className="kpis__label">Month-over-month</p>
@@ -87,6 +92,7 @@ export function KpiRow({
           <span className="kpis__sub"> / {formatMoney(monthTarget)}</span>
         </p>
         <p className="kpis__hint">{(mtdPct * 100).toFixed(1)}% of monthly target</p>
+        <p className="kpis__hint">MTD ASP {formatAsp(mtdAsp)}</p>
       </div>
       <div>
         <p className="kpis__label">MTD working days · {reviewMonthLabel}</p>

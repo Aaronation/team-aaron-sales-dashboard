@@ -179,12 +179,14 @@ export type MonthTotal = {
   quantity: number
   invoices: number
   customers: number
+  /** Sell-out ÷ units for the lines in this month. Null when units are zero. */
+  asp: number | null
 }
 
 export function monthlyTotals(items: LineItem[]): MonthTotal[] {
   const map = new Map<
     string,
-    Omit<MonthTotal, 'invoices' | 'customers'> & {
+    Omit<MonthTotal, 'invoices' | 'customers' | 'asp'> & {
       customerSet: Set<string>
       invoiceSet: Set<string>
     }
@@ -214,8 +216,65 @@ export function monthlyTotals(items: LineItem[]): MonthTotal[] {
       ...rest,
       customers: customerSet.size,
       invoices: invoiceSet.size,
+      asp: averageSellingPrice(rest.revenue, rest.quantity),
     }))
     .sort((a, b) => a.monthKey.localeCompare(b.monthKey))
+}
+
+export type MonthlyRepAsp = {
+  /** Aaron, Kelvin, Kenny, then any other salesperson who has lines. */
+  reps: string[]
+  /** Calendar month → salesperson → ASP. Missing lines are null. */
+  byMonth: Map<string, Map<string, number | null>>
+  /** Salesperson → ASP across every line passed in. */
+  totals: Map<string, number | null>
+}
+
+/** Per-rep ASP for the same lines that feed the monthly metrics table. */
+export function monthlyRepAsp(items: LineItem[]): MonthlyRepAsp {
+  const byMonthRaw = new Map<string, Map<string, { revenue: number; quantity: number }>>()
+  const totalRaw = new Map<string, { revenue: number; quantity: number }>()
+  const seen = new Set<string>()
+
+  for (const row of items) {
+    if (!row.date) continue
+    const name = row.salesperson || 'Unassigned'
+    seen.add(name)
+    const monthKey = monthKeyFromDate(row.date)
+    let month = byMonthRaw.get(monthKey)
+    if (!month) {
+      month = new Map()
+      byMonthRaw.set(monthKey, month)
+    }
+    const cell = month.get(name) ?? { revenue: 0, quantity: 0 }
+    cell.revenue += row.totalAmount || 0
+    cell.quantity += row.quantity || 0
+    month.set(name, cell)
+    const all = totalRaw.get(name) ?? { revenue: 0, quantity: 0 }
+    all.revenue += row.totalAmount || 0
+    all.quantity += row.quantity || 0
+    totalRaw.set(name, all)
+  }
+
+  const extras = [...seen]
+    .filter((name) => DEFAULT_SPLITS[name] == null)
+    .sort((a, b) => a.localeCompare(b))
+  const reps = [...Object.keys(DEFAULT_SPLITS), ...extras]
+  const byMonth = new Map<string, Map<string, number | null>>()
+  for (const [monthKey, month] of byMonthRaw) {
+    const aspByRep = new Map<string, number | null>()
+    for (const name of reps) {
+      const cell = month.get(name)
+      aspByRep.set(name, cell ? averageSellingPrice(cell.revenue, cell.quantity) : null)
+    }
+    byMonth.set(monthKey, aspByRep)
+  }
+  const totals = new Map<string, number | null>()
+  for (const name of reps) {
+    const cell = totalRaw.get(name)
+    totals.set(name, cell ? averageSellingPrice(cell.revenue, cell.quantity) : null)
+  }
+  return { reps, byMonth, totals }
 }
 
 export type SellOutShare = {
@@ -358,6 +417,17 @@ export function sumQty(items: LineItem[]): number {
   return items.reduce((s, r) => s + (r.quantity || 0), 0)
 }
 
+/** Tax-inclusive sell-out divided by units. Zero units is null, not zero. */
+export function averageSellingPrice(revenue: number, quantity: number): number | null {
+  if (!Number.isFinite(revenue) || !Number.isFinite(quantity) || quantity === 0) return null
+  return revenue / quantity
+}
+
+/** ASP for a filtered line set: sum(totalAmount) / sum(quantity). */
+export function asp(items: LineItem[]): number | null {
+  return averageSellingPrice(sumRevenue(items), sumQty(items))
+}
+
 export function uniqueCustomers(items: LineItem[]): number {
   return new Set(items.map((r) => r.customer).filter(Boolean)).size
 }
@@ -385,13 +455,19 @@ export function invoiceCountsBy(
   return new Map([...sets].map(([key, invoices]) => [key, invoices.size]))
 }
 
-export type NamedTotal = { name: string; revenue: number; quantity: number; lines: number }
+export type NamedTotal = {
+  name: string
+  revenue: number
+  quantity: number
+  lines: number
+  asp: number | null
+}
 
 export function groupBy(
   items: LineItem[],
   keyFn: (r: LineItem) => string | null | undefined,
 ): NamedTotal[] {
-  const map = new Map<string, NamedTotal>()
+  const map = new Map<string, Omit<NamedTotal, 'asp'>>()
   for (const r of items) {
     const k = keyFn(r)
     if (!k) continue
@@ -401,7 +477,9 @@ export function groupBy(
     cur.lines += 1
     map.set(k, cur)
   }
-  return [...map.values()].sort((a, b) => b.revenue - a.revenue)
+  return [...map.values()]
+    .map((row) => ({ ...row, asp: averageSellingPrice(row.revenue, row.quantity) }))
+    .sort((a, b) => b.revenue - a.revenue)
 }
 
 export type NamedDelta = NamedTotal & {
@@ -485,6 +563,12 @@ export function formatMoney(n: number): string {
     currency: 'HKD',
     maximumFractionDigits: 0,
   }).format(n)
+}
+
+/** Unit ASP in whole HKD, same rounding as other money. Null (no units) is an em dash. */
+export function formatAsp(value: number | null): string {
+  if (value == null || !Number.isFinite(value)) return '—'
+  return formatMoney(value)
 }
 
 export function formatPct(n: number): string {

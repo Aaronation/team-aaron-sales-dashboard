@@ -124,7 +124,7 @@ node .cursor/skills/verify-sales-dashboard/helpers/verify.mjs sha256 --file publ
 node .cursor/skills/verify-sales-dashboard/helpers/verify.mjs expect-sha256 --file public/data/sales-line-items.json --name seed-before
 ```
 
-Week labels and the MoM line use `·` (U+00B7) and `→` (U+2192). The working-day hint uses `–` (U+2013): `Mon–Fri through 10-18`. The search placeholder ellipsis is `…` (U+2026).
+Week labels and the MoM line use `·` (U+00B7) and `→` (U+2192). The working-day hint uses `–` (U+2013): `Mon–Fri through 10-12`. The search placeholder ellipsis is `…` (U+2026).
 
 Pass HKD strings in single quotes. Bash expands `"HK$30,000"` (`$3` or `$30`) before the helper sees it.
 
