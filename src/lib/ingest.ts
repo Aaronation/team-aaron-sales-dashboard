@@ -473,6 +473,11 @@ export function lineKey(row: LineItem): string {
   ].join('\u001f')
 }
 
+/** Invoice number used to snapshot a document. Blank numbers are not a group. */
+function invoiceNumber(row: LineItem): string | null {
+  return row.invoice.trim() ? row.invoice : null
+}
+
 /**
  * Map Kingdee 往来单位 (tradingPartner) → preferred customer label from rows that
  * already carry a short alias (seed: Vision, ADDL, CTM, …). Used on Merge so new
@@ -524,14 +529,18 @@ export function applyPartnerAlias(row: LineItem, aliases: Map<string, string>): 
   return row
 }
 
-export function mergeImportedItems(
+/**
+ * Merge one invoice at a time.
+ * Every non-empty invoice number in the file replaces that invoice’s working-set
+ * lines (revised qty, price, date, SKU set, customer label, or dropped lines).
+ * Invoices the file does not mention stay, so a partial export does not wipe them.
+ * Rows with no invoice number still dedupe on `lineKey` only.
+ * Identical keys inside the file are kept once.
+ */
+function mergeInvoiceSnapshots(
   existing: LineItem[],
   incoming: LineItem[],
-  mode: ImportMode,
 ): { lineItems: LineItem[]; added: number; replaced: number } {
-  if (mode === 'replace') {
-    return { lineItems: incoming, added: incoming.length, replaced: 0 }
-  }
   // Rematch onto wGAL Trading Partner → Customer Name (165 pairs), then fill any
   // gaps from seed tallies so Monthly top customers stay on short brands (Vision).
   const aliases = new Map<string, string>([
@@ -540,15 +549,59 @@ export function mergeImportedItems(
   ])
   const normalizedExisting = existing.map((row) => applyPartnerAlias(row, aliases))
   const normalizedIncoming = incoming.map((row) => applyPartnerAlias(row, aliases))
+
+  const incomingInvoices = new Set<string>()
+  for (const row of normalizedIncoming) {
+    const invoice = invoiceNumber(row)
+    if (invoice) incomingInvoices.add(invoice)
+  }
+
+  const existingInvoices = new Set<string>()
+  const existingKeys = new Set<string>()
+  for (const row of normalizedExisting) {
+    existingKeys.add(lineKey(row))
+    const invoice = invoiceNumber(row)
+    if (invoice) existingInvoices.add(invoice)
+  }
+
   const map = new Map<string, LineItem>()
-  for (const row of normalizedExisting) map.set(lineKey(row), row)
+  for (const row of normalizedExisting) {
+    const invoice = invoiceNumber(row)
+    if (invoice && incomingInvoices.has(invoice)) continue
+    map.set(lineKey(row), row)
+  }
+
   let added = 0
   let replaced = 0
+  const seenIncoming = new Set<string>()
   for (const row of normalizedIncoming) {
     const key = lineKey(row)
-    if (map.has(key)) replaced += 1
+    if (seenIncoming.has(key)) continue
+    seenIncoming.add(key)
+    const invoice = invoiceNumber(row)
+    const refreshesExisting =
+      (invoice != null && existingInvoices.has(invoice)) || existingKeys.has(key)
+    if (refreshesExisting) replaced += 1
     else added += 1
     map.set(key, row)
   }
+
   return { lineItems: [...map.values()], added, replaced }
+}
+
+export function mergeImportedItems(
+  existing: LineItem[],
+  incoming: LineItem[],
+  mode: ImportMode,
+): { lineItems: LineItem[]; added: number; replaced: number } {
+  switch (mode) {
+    case 'replace':
+      return { lineItems: incoming, added: incoming.length, replaced: 0 }
+    case 'merge':
+      return mergeInvoiceSnapshots(existing, incoming)
+    default: {
+      const unexpected: never = mode
+      throw new Error(`Unexpected import mode: ${String(unexpected)}`)
+    }
+  }
 }

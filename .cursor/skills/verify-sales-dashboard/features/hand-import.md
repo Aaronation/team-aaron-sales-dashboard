@@ -1,6 +1,6 @@
 # Hand import
 
-Hand import loads a CSV, Excel, or dashboard JSON file into the working set and saves it in this browser. Merge adds rows to the current lines. Replace swaps the working set and keeps team targets. Reset clears the save and reloads the bundled seed. The sample button fetches `public/data/sample-kingdee-import.csv`.
+Hand import loads a CSV, Excel, or dashboard JSON file into the working set and saves it in this browser. Merge replaces each invoice number that appears in the file and keeps invoices the file does not mention. The sample export’s invoices are new, so that merge still adds 5 rows. Replace swaps the working set and keeps team targets. Reset clears the save and reloads the bundled seed. The sample button fetches `public/data/sample-kingdee-import.csv`.
 
 ## Sub-features
 
