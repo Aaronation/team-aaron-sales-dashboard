@@ -181,6 +181,12 @@ describe('seed ASP', () => {
     const grandQty = months.reduce((sum, month) => sum + month.quantity, 0)
     const october = months.find((month) => month.monthKey === '2026-10')
     expect(formatAsp(october?.asp ?? null)).toBe('HK$113.65')
+    const aaronMonths = monthlyTotals(
+      filterIgnoringWeek(payload.lineItems, { ...filters, salesperson: 'Aaron Chang' }),
+    )
+    expect(formatAsp(aaronMonths.find((month) => month.monthKey === '2026-10')?.asp ?? null)).toBe(
+      'HK$94.01',
+    )
     expect(formatAsp(reps.byMonth.get('2026-10')?.get('Aaron Chang') ?? null)).toBe('HK$94.01')
     expect(formatAsp(reps.byMonth.get('2026-10')?.get('Kelvin Lai') ?? null)).toBe('HK$158.93')
     expect(averageSellingPrice(grandRevenue, grandQty)).toBe(grandRevenue / grandQty)

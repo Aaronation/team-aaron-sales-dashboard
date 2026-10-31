@@ -20,7 +20,6 @@ import {
   MONTHLY_TEAM_TARGETS,
   shortName,
   tickLabel,
-  type MonthlyRepAsp,
   type MonthTotal,
   type RepAchievement,
   type SellOutShare,
@@ -144,7 +143,6 @@ type Props = {
   salesperson: string
   teamMtdAsp: number | null
   mtdAspByRep: ReadonlyMap<string, number | null>
-  repMonthAsp: MonthlyRepAsp
 }
 
 function formatAchieve(achieve: number | null): string {
@@ -167,7 +165,6 @@ export function MonthlySales({
   salesperson,
   teamMtdAsp,
   mtdAspByRep,
-  repMonthAsp,
 }: Props) {
   const chartRows = months.map((month) => ({
     ...month,
@@ -182,6 +179,7 @@ export function MonthlySales({
     { revenue: 0, quantity: 0, invoices: 0 },
   )
   const grandAsp = averageSellingPrice(grand.revenue, grand.quantity)
+  const aspHeader = salesperson === 'all' ? 'ASP' : `${shortName(salesperson)} ASP`
   const repLabel = salesperson === 'all' ? null : shortName(salesperson)
   const pieRows = shares
     .filter((share) => share.revenue > 0)
@@ -517,10 +515,7 @@ export function MonthlySales({
               <th>Month</th>
               <th>Sales (HKD)</th>
               <th>Qty</th>
-              <th>ASP</th>
-              {repMonthAsp.reps.map((name) => (
-                <th key={name}>{shortName(name)} ASP</th>
-              ))}
+              <th>{aspHeader}</th>
               <th>Invoices</th>
               <th>Customers</th>
               {showTarget ? <th>Team target</th> : null}
@@ -530,7 +525,6 @@ export function MonthlySales({
             {months.map((month) => {
               const target = MONTHLY_TEAM_TARGETS[month.monthKey]
               const active = month.monthKey === activeMonthKey
-              const repAsp = repMonthAsp.byMonth.get(month.monthKey)
               return (
                 <tr key={month.monthKey} className={active ? 'is-active' : undefined}>
                   <td>
@@ -540,9 +534,6 @@ export function MonthlySales({
                   <td>{formatMoney(month.revenue)}</td>
                   <td>{Math.round(month.quantity).toLocaleString()}</td>
                   <td>{formatAsp(month.asp)}</td>
-                  {repMonthAsp.reps.map((name) => (
-                    <td key={name}>{formatAsp(repAsp?.get(name) ?? null)}</td>
-                  ))}
                   <td>{month.invoices.toLocaleString()}</td>
                   <td>{month.customers.toLocaleString()}</td>
                   {showTarget ? (
@@ -563,9 +554,6 @@ export function MonthlySales({
                 <td>{formatMoney(grand.revenue)}</td>
                 <td>{Math.round(grand.quantity).toLocaleString()}</td>
                 <td>{formatAsp(grandAsp)}</td>
-                {repMonthAsp.reps.map((name) => (
-                  <td key={name}>{formatAsp(repMonthAsp.totals.get(name) ?? null)}</td>
-                ))}
                 <td>{grand.invoices.toLocaleString()}</td>
                 <td />
                 {showTarget ? <td /> : null}
