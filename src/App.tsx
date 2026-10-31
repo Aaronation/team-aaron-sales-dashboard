@@ -359,7 +359,7 @@ export default function App() {
         <div className="hero__brand">
           <img
             className="hero__logo"
-            src="/brand/momax-logo-blue.svg"
+            src="/brand/momax-logo-black.svg"
             alt="Momax"
             width={201}
             height={32}
