@@ -1,7 +1,16 @@
 /// <reference types="node" />
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { filterMtdThroughWeek, monthDaily, monthKeyFromDate, reviewWindow, sumRevenue } from './aggregates'
+import {
+  asp,
+  filterMtdThroughWeek,
+  formatAsp,
+  formatMoney,
+  monthDaily,
+  monthKeyFromDate,
+  reviewWindow,
+  sumRevenue,
+} from './aggregates'
 import { mtdWorkingDays } from './hkHolidays'
 import { AMBER, CLAY, CREAM, SAGE, TAUPE, customerWeekFill } from './palette'
 import {
@@ -124,8 +133,10 @@ describe('customer working-day MoM and model reps', () => {
     expect(mom.span.priorThroughDate).toBe('2026-09-15')
     expect(mom.hasPrior).toBe(true)
     expect(mom.bars.map((bar) => bar.name)).toEqual(['Vision', 'Harbour'])
-    expect(mom.bars[0]).toMatchObject({ current: 100, prior: 0 })
-    expect(mom.bars[1]).toMatchObject({ current: 50, prior: 10 })
+    expect(mom.bars[0]).toMatchObject({ current: 100, prior: 0, asp: 100, priorAsp: null })
+    expect(mom.bars[1]).toMatchObject({ current: 50, prior: 10, asp: 25, priorAsp: 5 })
+    expect(formatAsp(mom.bars[0]?.asp ?? null)).toBe('HK$100')
+    expect(formatAsp(mom.bars[1]?.priorAsp ?? null)).toBe('HK$5')
     expect(mom.weeks.map((week) => week.label)).toEqual(['W40', 'W42'])
     expect(Object.values(mom.bars[1]?.weeks ?? {}).reduce((sum, amount) => sum + amount, 0)).toBe(50)
     expect(mom.bars[0]?.weeks[mom.weeks[1]?.key ?? '']).toBe(100)
@@ -148,9 +159,9 @@ describe('customer working-day MoM and model reps', () => {
     const later = customerWorkingDayMom(items, '2026-10', '2026-10-18')
     expect(early.span).toMatchObject({ workingDayCount: 6, priorThroughDate: '2026-09-08' })
     expect(early.weeks.map((week) => week.label)).toEqual(['W41'])
-    expect(early.bars[0]).toMatchObject({ current: 20, prior: 5 })
+    expect(early.bars[0]).toMatchObject({ current: 20, prior: 5, asp: 20, priorAsp: 5 })
     expect(later.weeks.map((week) => week.label)).toEqual(['W41', 'W42'])
-    expect(later.bars[0]).toMatchObject({ current: 100, prior: 20 })
+    expect(later.bars[0]).toMatchObject({ current: 100, prior: 20, asp: 50, priorAsp: 10 })
   })
 
   it('drops the last-month bar when that month has no lines, and follows the salesperson filter', () => {
@@ -162,14 +173,52 @@ describe('customer working-day MoM and model reps', () => {
     expect(all.hasPrior).toBe(false)
     expect(all.span.priorMonthKey).toBe('2026-07')
     expect(all.span.priorThroughDate).toBe('2026-07-08')
-    expect(all.bars.every((bar) => bar.prior == null)).toBe(true)
+    expect(all.bars.every((bar) => bar.prior == null && bar.priorAsp == null)).toBe(true)
     const kelvin = customerWorkingDayMom(
       items.filter((row) => row.salesperson === 'Kelvin Lai'),
       '2026-08',
       '2026-08-09',
     )
     expect(kelvin.bars.map((bar) => bar.name)).toEqual(['Vision'])
-    expect(kelvin.bars[0]?.current).toBe(15)
+    expect(kelvin.bars[0]).toMatchObject({ current: 15, asp: 15, priorAsp: null })
+  })
+
+  it('uses sell-out divided by quantity for this period and last month, including a zero-qty line', () => {
+    const items = [
+      line('2026-10-12', 100, { customer: 'Vision', quantity: 2, invoice: 'v1' }),
+      line('2026-10-13', 50, { customer: 'Vision', quantity: 0, invoice: 'v0' }),
+      line('2026-10-19', 999, { customer: 'Vision', quantity: 9, invoice: 'after' }),
+      line('2026-09-02', 30, { customer: 'Vision', quantity: 3, invoice: 'sep' }),
+      line('2026-09-16', 80, { customer: 'Vision', quantity: 1, invoice: 'sep-late' }),
+      line('2026-10-12', 40, { customer: 'Harbour', salesperson: 'Kelvin Lai', quantity: 4, invoice: 'hk' }),
+      line('2026-10-12', 20, { customer: 'Harbour', salesperson: 'Aaron Chang', quantity: 1, invoice: 'ha' }),
+      line('2026-10-06', 80, { customer: 'Zero', quantity: 0, invoice: 'z' }),
+    ]
+    const mom = customerWorkingDayMom(items, '2026-10', '2026-10-18')
+    expect(mom.bars.find((bar) => bar.name === 'Vision')).toMatchObject({
+      current: 150,
+      prior: 30,
+      asp: 75,
+      priorAsp: 10,
+    })
+    expect(formatAsp(75)).toBe('HK$75')
+    expect(formatAsp(10)).toBe('HK$10')
+    expect(mom.bars.find((bar) => bar.name === 'Zero')).toMatchObject({
+      current: 80,
+      asp: null,
+      priorAsp: null,
+    })
+    expect(formatAsp(null)).toBe('—')
+
+    const kelvin = customerWorkingDayMom(
+      items.filter((row) => row.salesperson === 'Kelvin Lai'),
+      '2026-10',
+      '2026-10-18',
+    )
+    expect(kelvin.bars).toEqual([
+      expect.objectContaining({ name: 'Harbour', current: 40, asp: 10, prior: null, priorAsp: null }),
+    ])
+    expect(formatAsp(kelvin.bars[0]?.asp ?? null)).toBe('HK$10')
   })
 
   it('stacks product models by salesperson quantity inside the MTD window', () => {
@@ -226,6 +275,38 @@ describe('customer working-day MoM and model reps', () => {
     )
     expect(kelvin.bars.length).toBeGreaterThan(0)
     expect(kelvin.bars.reduce((sum, bar) => sum + bar.current, 0)).toBeLessThan(weekTotal)
+    const customerLines = (name: string, salesperson: string | null, start: string, end: string) =>
+      payload.lineItems.filter(
+        (row) =>
+          row.customer === name &&
+          (salesperson == null || row.salesperson === salesperson) &&
+          row.date != null &&
+          row.date >= start &&
+          row.date <= end,
+      )
+    for (const bar of throughWeek.bars) {
+      expect(bar.asp).toBe(asp(customerLines(bar.name, null, '2026-10-01', '2026-10-18')))
+      expect(bar.priorAsp).toBe(
+        asp(customerLines(bar.name, null, '2026-09-01', throughWeek.span.priorThroughDate ?? '2026-09-15')),
+      )
+      expect(formatAsp(bar.asp)).toMatch(/^(HK\$[\d,]+|—)$/)
+    }
+    for (const bar of kelvin.bars) {
+      expect(bar.asp).toBe(asp(customerLines(bar.name, 'Kelvin Lai', '2026-10-01', '2026-10-18')))
+    }
+    const top = throughWeek.bars[0]
+    expect(top?.name).toBe('CTM')
+    expect({
+      current: formatMoney(Math.round(top?.current ?? 0)),
+      prior: formatMoney(Math.round(top?.prior ?? 0)),
+      asp: formatAsp(top?.asp ?? null),
+      priorAsp: formatAsp(top?.priorAsp ?? null),
+    }).toEqual({
+      current: 'HK$90,450',
+      prior: 'HK$332,790',
+      asp: 'HK$185',
+      priorAsp: 'HK$30',
+    })
     expect(models.series.map((series) => series.label)).toEqual(['Aaron', 'Kelvin', 'Kenny'])
     expect(models.bars[0]?.name).not.toMatch(/Aaron|Kelvin|Kenny/)
     const modelQty = models.bars.reduce((sum, bar) => sum + bar.total, 0)

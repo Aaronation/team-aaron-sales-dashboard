@@ -75,7 +75,15 @@ function MomTooltip({
   payload,
 }: {
   active?: boolean
-  payload?: { payload?: { fullName?: string; current?: number; prior?: number | null } }[]
+  payload?: {
+    payload?: {
+      fullName?: string
+      current?: number
+      prior?: number | null
+      asp?: number | null
+      priorAsp?: number | null
+    }
+  }[]
 }) {
   const row = payload?.[0]?.payload
   if (!active || !row) return null
@@ -84,6 +92,8 @@ function MomTooltip({
       <p className="chart-tip__title">{row.fullName}</p>
       <p>This period · {formatMoney(row.current ?? 0)}</p>
       {row.prior == null ? null : <p>Last month · {formatMoney(row.prior)}</p>}
+      <p>This period ASP · {formatAsp(row.asp ?? null)}</p>
+      {row.prior == null ? null : <p>Last month ASP · {formatAsp(row.priorAsp ?? null)}</p>}
     </div>
   )
 }
@@ -195,6 +205,8 @@ export function MonthlySales({
     fullName: customer.name,
     current: Math.round(customer.current),
     prior: customer.prior == null ? null : Math.round(customer.prior),
+    asp: customer.asp,
+    priorAsp: customer.priorAsp,
     ...Object.fromEntries(
       (customerMom?.weeks ?? []).map((week) => [
         segmentKey('week', week.key),
