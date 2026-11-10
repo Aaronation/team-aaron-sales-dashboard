@@ -1,5 +1,6 @@
 import {
   addMonthsClamped,
+  averageSellingPrice,
   formatMonthLabel,
   isoWeekKey,
   monthDaily,
@@ -167,6 +168,10 @@ export type CustomerMomBar = {
   weeks: Record<string, number>
   /** Null when last month has no loaded lines. Zero means the span had no sales. */
   prior: number | null
+  /** This-period ASP: sum(totalAmount) / sum(quantity) inside the MTD window. Null when units are 0. */
+  asp: number | null
+  /** Last-month ASP on the same working-day span. Null when that month is absent or units are 0. */
+  priorAsp: number | null
 }
 
 export type CustomerMom = {
@@ -183,8 +188,9 @@ function inMonthThrough(date: string, monthKey: string, throughDate: string): bo
 
 /**
  * Top customers for the review-month MTD window, each with last month’s sell-out
- * on the matching working-day span. `items` should already follow salesperson,
- * department, and search.
+ * on the matching working-day span. ASP uses those same lines
+ * (`averageSellingPrice`). `items` should already follow salesperson, department,
+ * and search.
  */
 export function customerWorkingDayMom(
   items: LineItem[],
@@ -198,12 +204,16 @@ export function customerWorkingDayMom(
   )
   const currentTotals = new Map<string, number>()
   const priorTotals = new Map<string, number>()
+  const currentQty = new Map<string, number>()
+  const priorQty = new Map<string, number>()
   const byWeek = new Map<string, Map<string, number>>()
   for (const row of items) {
     if (!row.date || !row.customer) continue
     const amount = row.totalAmount || 0
+    const quantity = row.quantity || 0
     if (inMonthThrough(row.date, monthKey, span.throughDate)) {
       currentTotals.set(row.customer, (currentTotals.get(row.customer) ?? 0) + amount)
+      currentQty.set(row.customer, (currentQty.get(row.customer) ?? 0) + quantity)
       const week = isoWeekKey(row.date)
       let weeks = byWeek.get(row.customer)
       if (!weeks) {
@@ -214,6 +224,7 @@ export function customerWorkingDayMom(
     }
     if (span.priorThroughDate && inMonthThrough(row.date, span.priorMonthKey, span.priorThroughDate)) {
       priorTotals.set(row.customer, (priorTotals.get(row.customer) ?? 0) + amount)
+      priorQty.set(row.customer, (priorQty.get(row.customer) ?? 0) + quantity)
     }
   }
   const usedWeeks = new Set<string>()
@@ -229,6 +240,10 @@ export function customerWorkingDayMom(
       current,
       weeks,
       prior: hasPrior ? (priorTotals.get(name) ?? 0) : null,
+      asp: averageSellingPrice(current, currentQty.get(name) ?? 0),
+      priorAsp: hasPrior
+        ? averageSellingPrice(priorTotals.get(name) ?? 0, priorQty.get(name) ?? 0)
+        : null,
     }
   })
   const weeks = [...usedWeeks].sort().map((weekKey) => ({ key: weekKey, label: weekTick(weekKey) }))
