@@ -69,7 +69,7 @@ Ambiguous numeric dates (`06/11/2026`) are read as day/month/year.
 | Product model | no | 产品型号, 规格型号, Product Model |
 | Product name | no | Product Name, 物料名称, 商品名称 |
 
-A title block above the header row is skipped. Rows labeled 合计 / Total are skipped. **Merge** replaces each invoice number in the file with that file’s lines (revised qty, price, date, items, or removals) and keeps invoices the file does not mention. Identical lines inside an invoice are still deduped. **Replace** swaps the working set and keeps the team targets from the seed.
+A title block above the header row is skipped. Rows labeled 合计 / Total are skipped. **Merge** replaces each invoice number in the file with that file’s lines (revised qty, price, date, items, or removals) and keeps invoices the file does not mention. Repeated identical lines on one invoice are kept, because the Kingdee document total includes each of them. Importing that invoice again replaces the set, so the same file does not stack. Rows with no invoice number are still deduped. **Replace** swaps the working set and keeps the team targets from the seed.
 
 CSV may be UTF-8 or GB18030. Excel workbooks use the sheet named `Data` when several sheets match.
 

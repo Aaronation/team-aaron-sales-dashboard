@@ -533,9 +533,10 @@ export function applyPartnerAlias(row: LineItem, aliases: Map<string, string>): 
  * Merge one invoice at a time.
  * Every non-empty invoice number in the file replaces that invoice’s working-set
  * lines (revised qty, price, date, SKU set, customer label, or dropped lines).
- * Invoices the file does not mention stay, so a partial export does not wipe them.
- * Rows with no invoice number still dedupe on `lineKey` only.
- * Identical keys inside the file are kept once.
+ * Invoices the file does not mention stay, including a repeated identical line.
+ * Kingdee’s document total counts each of those lines (SI26110098 lists IP116AM
+ * twice at HK$180). Importing that invoice again replaces the set, so the same
+ * file does not stack. Rows with no invoice number still dedupe on `lineKey`.
  */
 function mergeInvoiceSnapshots(
   existing: LineItem[],
@@ -564,26 +565,43 @@ function mergeInvoiceSnapshots(
     if (invoice) existingInvoices.add(invoice)
   }
 
+  // `lineKey` matches a repeated Kingdee line. The map key adds an occurrence so
+  // the second HK$180 row is not overwritten, and so a later merge of some other
+  // invoice does not collapse a pair the file never mentioned.
+  const occurrences = new Map<string, number>()
   const map = new Map<string, LineItem>()
+  const put = (row: LineItem) => {
+    const key = lineKey(row)
+    if (!invoiceNumber(row)) {
+      map.set(key, row)
+      return
+    }
+    const seen = occurrences.get(key) ?? 0
+    occurrences.set(key, seen + 1)
+    map.set(seen === 0 ? key : `${key}\u001e${seen}`, row)
+  }
+
   for (const row of normalizedExisting) {
     const invoice = invoiceNumber(row)
     if (invoice && incomingInvoices.has(invoice)) continue
-    map.set(lineKey(row), row)
+    put(row)
   }
 
   let added = 0
   let replaced = 0
-  const seenIncoming = new Set<string>()
+  const seenBlank = new Set<string>()
   for (const row of normalizedIncoming) {
     const key = lineKey(row)
-    if (seenIncoming.has(key)) continue
-    seenIncoming.add(key)
     const invoice = invoiceNumber(row)
+    if (!invoice) {
+      if (seenBlank.has(key)) continue
+      seenBlank.add(key)
+    }
     const refreshesExisting =
       (invoice != null && existingInvoices.has(invoice)) || existingKeys.has(key)
     if (refreshesExisting) replaced += 1
     else added += 1
-    map.set(key, row)
+    put(row)
   }
 
   return { lineItems: [...map.values()], added, replaced }

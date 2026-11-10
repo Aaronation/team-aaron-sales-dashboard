@@ -440,7 +440,7 @@ describe('invoice-aware merge', () => {
     })
   })
 
-  it('does not double-count identical lines inside one invoice', () => {
+  it('keeps both identical lines on an invoice and does not stack them on a second merge', () => {
     const line = lineItem({
       invoice: 'SI-1',
       date: '2026-10-02',
@@ -449,17 +449,96 @@ describe('invoice-aware merge', () => {
       totalAmount: 40,
       customer: 'Vision',
     })
-    const merged = mergeImportedItems(
-      [lineItem({ invoice: 'SI-KEEP', date: '2026-10-01', totalAmount: 10, customer: 'ADDL' })],
-      [line, { ...line }],
-      'merge',
-    )
+    const keep = lineItem({ invoice: 'SI-KEEP', date: '2026-10-01', totalAmount: 10, customer: 'ADDL' })
+    const merged = mergeImportedItems([keep], [line, { ...line }], 'merge')
     const invoice = merged.lineItems.filter((row) => row.invoice === 'SI-1')
 
-    expect(invoice).toHaveLength(1)
-    expect(sumRevenue(invoice)).toBe(40)
+    expect(invoice).toHaveLength(2)
+    expect(sumRevenue(invoice)).toBe(80)
+    expect(merged.added).toBe(2)
+    expect(merged.lineItems).toHaveLength(3)
+
+    const again = mergeImportedItems(merged.lineItems, [line, { ...line }], 'merge')
+    expect(again.added).toBe(0)
+    expect(again.replaced).toBe(2)
+    expect(again.lineItems.filter((row) => row.invoice === 'SI-1')).toHaveLength(2)
+    expect(sumRevenue(again.lineItems.filter((row) => row.invoice === 'SI-1'))).toBe(80)
+    expect(again.lineItems.find((row) => row.invoice === 'SI-KEEP')?.totalAmount).toBe(10)
+    expect(again.lineItems).toHaveLength(merged.lineItems.length)
+  })
+
+  it('keeps both Kelvin IP116AM lines on SI26110098 (the HK$180 sell-out gap)', () => {
+    const headers = [
+      'Document Number',
+      'Trading Partner',
+      'Business Date',
+      'Salesperson',
+      'Material Code',
+      'Quantity',
+      'Unit Price',
+      'Tax-Inclusive Amount',
+    ]
+    const orange = ['SI26110098', '維修手機中心', '2026-11-03', 'Kelvin Lai', 'IP116AM', 1, 180, 180]
+    const black = ['SI26110098', '維修手機中心', '2026-11-03', 'Kelvin Lai', 'IP116AD', 1, 180, 180]
+    // Kingdee list for 2026-11-03 repeats IP116AM. Document Amount 2984 includes both HK$180 rows.
+    // Dropping the twin made Kelvin’s day HK$22,343 instead of HK$22,523.
+    const incoming = ingestSheet([headers, orange, black, orange])
+    const merged = mergeImportedItems(
+      [lineItem({ invoice: 'SI-OTHER', date: '2026-11-02', totalAmount: 10, customer: 'ADDL' })],
+      incoming,
+      'merge',
+    )
+    const twins = merged.lineItems.filter((row) => row.invoice === 'SI26110098' && row.sku === 'IP116AM')
+
+    expect(twins).toHaveLength(2)
+    expect(twins.every((row) => row.totalAmount === 180 && row.date === '2026-11-03')).toBe(true)
+    expect(twins.every((row) => row.salesperson === 'Kelvin Lai')).toBe(true)
+    expect(sumRevenue(merged.lineItems.filter((row) => row.salesperson === 'Kelvin Lai' && row.date === '2026-11-03'))).toBe(540)
+
+    const again = mergeImportedItems(merged.lineItems, incoming, 'merge')
+    expect(again.lineItems.filter((row) => row.invoice === 'SI26110098' && row.sku === 'IP116AM')).toHaveLength(2)
+    expect(sumRevenue(again.lineItems.filter((row) => row.date === '2026-11-03' && row.salesperson === 'Kelvin Lai'))).toBe(540)
+    expect(again.lineItems.find((row) => row.invoice === 'SI-OTHER')?.totalAmount).toBe(10)
+  })
+
+  it('keeps identical lines on an invoice the file does not mention', () => {
+    const twin = lineItem({
+      invoice: 'SI26100163',
+      date: '2026-10-06',
+      sku: 'US18AUKW',
+      quantity: 1,
+      totalAmount: 167,
+      customer: 'UNI Store',
+      salesperson: 'Kelvin Lai',
+    })
+    const merged = mergeImportedItems(
+      [twin, { ...twin }],
+      [
+        lineItem({
+          invoice: 'SI-NEW',
+          date: '2026-11-03',
+          sku: 'IP116AM',
+          totalAmount: 180,
+          customer: '維修手機中心',
+          salesperson: 'Kelvin Lai',
+        }),
+      ],
+      'merge',
+    )
+    const kept = merged.lineItems.filter((row) => row.invoice === 'SI26100163')
+
+    expect(kept).toHaveLength(2)
+    expect(sumRevenue(kept)).toBe(334)
+    expect(merged.lineItems.filter((row) => row.invoice === 'SI-NEW')).toHaveLength(1)
+  })
+
+  it('still dedupes identical rows that have no invoice number', () => {
+    const line = lineItem({ invoice: '', date: '2026-10-01', sku: 'A', totalAmount: 10, customer: 'ADDL' })
+    const merged = mergeImportedItems([], [line, { ...line }], 'merge')
+
+    expect(merged.lineItems).toHaveLength(1)
+    expect(sumRevenue(merged.lineItems)).toBe(10)
     expect(merged.added).toBe(1)
-    expect(merged.lineItems).toHaveLength(2)
   })
 
   it('replaces bundled seed invoice SI26100020 and keeps a neighbor invoice', () => {
@@ -477,12 +556,17 @@ describe('invoice-aware merge', () => {
       ['SI26100020', '2026-10-02', shop11, 'Kelvin Lai', 'UD31-REV', 2, 1000],
       ['SI-NEW-AWARE', '2026-10-02', shop11, 'Kelvin Lai', 'NEW-SKU', 1, 500],
     ])
-    const uniqueBefore = new Set(seed.lineItems.map((row) => lineKey(row))).size
+    const kelvinTwin = seed.lineItems.filter(
+      (row) => row.invoice === 'SI26100163' && row.sku === 'US18AUKW' && row.salesperson === 'Kelvin Lai',
+    )
+    expect(kelvinTwin).toHaveLength(2)
+    expect(sumRevenue(kelvinTwin)).toBe(334)
     const first = mergeImportedItems(seed.lineItems, incoming, 'merge')
 
     expect(first.added).toBe(1)
     expect(first.replaced).toBe(1)
-    expect(first.lineItems).toHaveLength(uniqueBefore - before.length + incoming.length)
+    expect(first.lineItems).toHaveLength(seed.lineItems.length - before.length + incoming.length)
+    expect(first.lineItems.filter((row) => row.invoice === 'SI26100163' && row.sku === 'US18AUKW')).toHaveLength(2)
     expect(first.lineItems.filter((row) => row.invoice === 'SI26100020')).toMatchObject([
       { customer: 'Lancer', sku: 'UD31-REV', quantity: 2, totalAmount: 1000 },
     ])
