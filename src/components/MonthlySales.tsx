@@ -91,9 +91,13 @@ function MomTooltip({
     <div className="chart-tip">
       <p className="chart-tip__title">{row.fullName}</p>
       <p>This period · {formatMoney(row.current ?? 0)}</p>
-      {row.prior == null ? null : <p>Last month · {formatMoney(row.prior)}</p>}
-      <p>This period ASP · {formatAsp(row.asp ?? null)}</p>
-      {row.prior == null ? null : <p>Last month ASP · {formatAsp(row.priorAsp ?? null)}</p>}
+      <p className="chart-tip__asp">This period ASP · {formatAsp(row.asp ?? null)}</p>
+      {row.prior == null ? null : (
+        <>
+          <p>Last month · {formatMoney(row.prior)}</p>
+          <p className="chart-tip__asp">Last month ASP · {formatAsp(row.priorAsp ?? null)}</p>
+        </>
+      )}
     </div>
   )
 }
