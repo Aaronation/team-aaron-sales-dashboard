@@ -258,7 +258,7 @@ export type FollowUpAccount = {
   priorMonth: number
   /**
    * Last month’s same working-day window. Null when that window is not above
-   * zero, so the row shows the name only.
+   * zero; the row still shows HK$0 beside the full month.
    */
   priorWindow: number | null
 }
