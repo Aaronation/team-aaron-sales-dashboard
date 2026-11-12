@@ -202,17 +202,24 @@ describe('customer whitespace and case identity', () => {
     expect(kelvinChase?.some((account) => customerMatchKey(account.name) === customerMatchKey('CTM'))).toBe(false)
   })
 
-  it('drops 星馳通訊器材 from totals, top customers, and follow up', () => {
+  it('drops 星馳通訊器材 and 星馳通訊 from totals, top customers, and follow up', () => {
     const items = [
-      line('2026-10-06', 100, '星馳通訊器材', { invoice: 'bad', quantity: 2 }),
-      line('2026-09-20', 80, '星馳 通訊器材', { invoice: 'bad-space', quantity: 1 }),
-      line('2026-10-06', 50, '星馳通訊', { invoice: 'similar', quantity: 1 }),
-      line('2026-10-06', 40, 'Harbour', { invoice: 'keep', quantity: 4 }),
-      line('2026-09-02', 30, 'Harbour', { invoice: 'keep-prior', quantity: 3 }),
+      line('2026-10-06', 100, '星馳通訊器材', { invoice: 'bad', quantity: 2, salesperson: 'Aaron Chang' }),
+      line('2026-09-20', 80, '星馳 通訊器材', { invoice: 'bad-space', salesperson: 'Aaron Chang' }),
+      line('2026-09-22', 70, '星馳\u200B通訊器材有限公司', { invoice: 'bad-suffix', salesperson: 'Aaron Chang' }),
+      line('2026-09-18', 60, '星馳通訊', { invoice: 'short', salesperson: 'Aaron Chang' }),
+      line('2026-10-06', 50, '星馳數碼', { invoice: 'similar', quantity: 1, salesperson: 'Aaron Chang' }),
+      line('2026-10-06', 40, 'Harbour', { invoice: 'keep', quantity: 4, salesperson: 'Aaron Chang' }),
+      line('2026-09-02', 30, 'Harbour', { invoice: 'keep-prior', quantity: 3, salesperson: 'Aaron Chang' }),
     ]
     expect(isExcludedCustomer('星馳通訊器材')).toBe(true)
     expect(isExcludedCustomer('星馳\u3000通訊器材')).toBe(true)
-    expect(isExcludedCustomer('星馳通訊')).toBe(false)
+    expect(isExcludedCustomer('星馳\u200B通訊器材有限公司')).toBe(true)
+    expect(isExcludedCustomer('星馳通訊器材股份有限公司')).toBe(true)
+    expect(isExcludedCustomer('星馳通訊')).toBe(true)
+    expect(isExcludedCustomer('星馳 通訊')).toBe(true)
+    expect(isExcludedCustomer('星馳通訊有限公司')).toBe(true)
+    expect(isExcludedCustomer('星馳數碼')).toBe(false)
     expect(isExcludedCustomer('Harbour')).toBe(false)
 
     const kept = canonicalizeCustomers(items)
@@ -220,21 +227,29 @@ describe('customer whitespace and case identity', () => {
     expect(sumRevenue(kept)).toBe(120)
     expect(monthlyTotals(kept).find((month) => month.monthKey === '2026-10')?.revenue).toBe(90)
     expect(asp(kept.filter((row) => row.date?.startsWith('2026-10')))).toBe(90 / 5)
-    expect(groupBy(kept, (row) => row.customer).map((row) => row.name)).toEqual(['Harbour', '星馳通訊'])
+    expect(groupBy(kept, (row) => row.customer).map((row) => row.name)).toEqual(['Harbour', '星馳數碼'])
 
     const mom = customerWorkingDayMom(items, '2026-10', '2026-10-18')
-    expect(mom.bars.map((bar) => bar.name)).toEqual(['星馳通訊', 'Harbour'])
+    expect(mom.bars.map((bar) => bar.name)).toEqual(['星馳數碼', 'Harbour'])
     expect(mom.bars.find((bar) => bar.name === 'Harbour')).toMatchObject({ current: 40, prior: 30 })
     const chase = followUpAccounts(items, '2026-10', '2026-10-18', 'Aaron Chang')
     expect(chase?.some((account) => isExcludedCustomer(account.name))).toBe(false)
+    expect(chase?.some((account) => account.name.includes('星馳通訊'))).toBe(false)
     expect(chase).toEqual([])
 
     const loaded = ingestRecords([
       {
         date: '2026-10-06',
         totalAmount: 10,
-        customer: '星馳通訊器材',
+        customer: '星馳通訊器材有限公司',
         invoice: 'X',
+        salesperson: 'Aaron Chang',
+      },
+      {
+        date: '2026-10-06',
+        totalAmount: 12,
+        customer: '星馳通訊',
+        invoice: 'S',
         salesperson: 'Aaron Chang',
       },
       {

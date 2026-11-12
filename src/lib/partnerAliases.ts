@@ -188,8 +188,29 @@ for (const group of CUSTOMER_ALIAS_GROUPS) {
   for (const name of group.names) aliasLabelByKey.set(whitespaceCaseKey(name), group.label)
 }
 
-/** Named customers Aaron asked to drop. Matched with the identity key, not a fuzzy name. */
-const EXCLUDED_CUSTOMERS = ['星馳通訊器材'] as const
+/**
+ * Named customers Aaron asked to drop. Compared after the same identity key,
+ * once invisible characters and the legal suffixes the list label strips
+ * (有限公司 / 股份有限公司 / Limited) are removed. A stored
+ * `星馳通訊器材有限公司` therefore matches `星馳通訊器材`. This is not a
+ * prefix match: `星馳數碼` stays.
+ */
+const EXCLUDED_CUSTOMERS = ['星馳通訊器材', '星馳通訊'] as const
+
+const INVISIBLE_CHARS = /\u200B|\u200C|\u200D|\u2060|\uFEFF|\u180E/g
+const LEGAL_FORM =
+  /(?:\s+(?:company\s+limited|co\.?,?\s*ltd\.?|limited|ltd\.?|company)|股份有限公司|有限公司)/i
+
+function exclusionKey(name: string): string {
+  const folded = name.normalize('NFKC').replace(INVISIBLE_CHARS, '')
+  let text = folded
+  let previous = ''
+  while (text && text !== previous) {
+    previous = text
+    text = text.replace(LEGAL_FORM, '')
+  }
+  return customerMatchKey(text)
+}
 
 /**
  * Identity for customer labels. Whitespace, including full-width spaces, and
@@ -208,7 +229,7 @@ function aliasLabel(name: string): string | null {
 
 export function isExcludedCustomer(name: string | null | undefined): boolean {
   if (!name) return false
-  const key = customerMatchKey(name)
+  const key = exclusionKey(name)
   return EXCLUDED_CUSTOMERS.some((excluded) => customerMatchKey(excluded) === key)
 }
 
