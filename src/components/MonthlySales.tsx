@@ -155,8 +155,8 @@ function FollowUpList({ shareLabel, accounts }: { shareLabel: string; accounts: 
         {`Follow up · ${shareLabel}`}<span className="follow-up__count">{` · ${accountCountLabel(accounts.length)}`}</span>
       </figcaption>
       <p className="monthly__caption">
-        Bought in last month’s same working-day window, $0 so far this period. Ranked by last
-        month’s amount.
+        Bought anytime last month, $0 so far this period. The amount is last month’s same
+        working-day window when that was over $0.
       </p>
       {accounts.length === 0 ? (
         <p className="monthly__empty">No accounts to chase in this window.</p>
@@ -165,7 +165,9 @@ function FollowUpList({ shareLabel, accounts }: { shareLabel: string; accounts: 
           {accounts.map((account) => (
             <li key={account.name} className="follow-up__row">
               <span className="follow-up__name">{displayCustomer(account.name)}</span>
-              <span className="follow-up__amount">{formatMoney(Math.round(account.prior))}</span>
+              <span className="follow-up__amount">
+                {account.priorWindow != null ? formatMoney(Math.round(account.priorWindow)) : null}
+              </span>
               <span className="follow-up__pill">Not yet</span>
             </li>
           ))}

@@ -88,7 +88,7 @@ describe('customer whitespace and case identity', () => {
       line('2026-09-04', 12, 'YOHO 友和', { invoice: 'b' }),
     ]
     expect(followUpAccounts(items, '2026-10', '2026-10-18', 'Aaron Chang')).toEqual([
-      { name: 'YOHO 友和', prior: 42 },
+      { name: 'YOHO 友和', priorMonth: 42, priorWindow: 42 },
     ])
   })
 
@@ -127,8 +127,8 @@ describe('customer whitespace and case identity', () => {
       line('2026-09-04', 7, 'Something Limited', { invoice: 'only-some' }),
     ]
     expect(followUpAccounts(priorOnly, '2026-10', '2026-10-18', 'Aaron Chang')).toEqual([
-      { name: 'CTM', prior: 70 },
-      { name: 'Something Limited', prior: 7 },
+      { name: 'CTM', priorMonth: 70, priorWindow: 70 },
+      { name: 'Something Limited', priorMonth: 7, priorWindow: 7 },
     ])
     expect(WGAL_PARTNER_ALIASES['澳門電訊股份有限公司']).toBe('CTM')
   })
