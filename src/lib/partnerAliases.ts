@@ -188,6 +188,9 @@ for (const group of CUSTOMER_ALIAS_GROUPS) {
   for (const name of group.names) aliasLabelByKey.set(whitespaceCaseKey(name), group.label)
 }
 
+/** Named customers Aaron asked to drop. Matched with the identity key, not a fuzzy name. */
+const EXCLUDED_CUSTOMERS = ['星馳通訊器材'] as const
+
 /**
  * Identity for customer labels. Whitespace, including full-width spaces, and
  * letter case do not make a second customer. Named alias groups, such as CTM,
@@ -201,6 +204,16 @@ export function customerMatchKey(name: string): string {
 
 function aliasLabel(name: string): string | null {
   return aliasLabelByKey.get(whitespaceCaseKey(name)) ?? null
+}
+
+export function isExcludedCustomer(name: string | null | undefined): boolean {
+  if (!name) return false
+  const key = customerMatchKey(name)
+  return EXCLUDED_CUSTOMERS.some((excluded) => customerMatchKey(excluded) === key)
+}
+
+export function excludeCustomers<T extends { customer: string | null }>(items: readonly T[]): T[] {
+  return items.filter((row) => !isExcludedCustomer(row.customer))
 }
 
 function readableCustomerScore(name: string): number {
@@ -234,10 +247,11 @@ export function canonicalCustomerLabel(names: readonly string[]): string {
   return ranked[0]?.[0] ?? ''
 }
 
-/** Copy lines so every customer group uses one label. Stored text is left unchanged. */
+/** Copy lines so every customer group uses one label. Excluded customers are removed. */
 export function canonicalizeCustomers<T extends { customer: string | null }>(items: readonly T[]): T[] {
+  const source = excludeCustomers(items)
   const byKey = new Map<string, string[]>()
-  for (const row of items) {
+  for (const row of source) {
     if (!row.customer) continue
     const key = customerMatchKey(row.customer)
     if (!key) continue
@@ -247,7 +261,7 @@ export function canonicalizeCustomers<T extends { customer: string | null }>(ite
   }
   const labels = new Map<string, string>()
   for (const [key, names] of byKey) labels.set(key, canonicalCustomerLabel(names))
-  return items.map((row) => {
+  return source.map((row) => {
     if (!row.customer) return row
     const label = labels.get(customerMatchKey(row.customer))
     if (!label || label === row.customer) return row

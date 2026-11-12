@@ -138,26 +138,22 @@ export default function App() {
     }
   }
 
-  const weeks = useMemo(
-    () => (payload ? listWeekKeys(payload.lineItems) : []),
-    [payload],
-  )
   const canonicalLines = useMemo(
     () => (payload ? canonicalizeCustomers(payload.lineItems) : []),
     [payload],
   )
+  const weeks = useMemo(() => listWeekKeys(canonicalLines), [canonicalLines])
   const salespeople = useMemo(
-    () => (payload ? uniqueSorted(payload.lineItems.map((r) => r.salesperson)) : []),
-    [payload],
+    () => uniqueSorted(canonicalLines.map((row) => row.salesperson)),
+    [canonicalLines],
   )
   const departments = useMemo(
-    () => (payload ? uniqueSorted(payload.lineItems.map((r) => r.department)) : []),
-    [payload],
+    () => uniqueSorted(canonicalLines.map((row) => row.department)),
+    [canonicalLines],
   )
-
   const entryDates = useMemo(
-    () => (payload ? payload.lineItems.map((row) => row.date) : []),
-    [payload],
+    () => canonicalLines.map((row) => row.date),
+    [canonicalLines],
   )
   const review = filters && filters.weekKey !== 'all' ? reviewWindow(filters.weekKey) : null
   const selectedRange = review?.range ?? null
@@ -366,7 +362,7 @@ export default function App() {
         target: pacedTarget.amount,
       })
     : null
-  const dateExtent = payload.lineItems
+  const dateExtent = canonicalLines
     .map((r) => r.date)
     .filter((d): d is string => Boolean(d))
     .sort()
@@ -509,7 +505,7 @@ export default function App() {
 
       <footer className="footer">
         <p>
-          Phase 3 · {uniqueInvoices(payload.lineItems).toLocaleString()} invoices · ISO week{' '}
+          Phase 3 · {uniqueInvoices(canonicalLines).toLocaleString()} invoices · ISO week{' '}
           {filters.weekKey}
           {payload.meta.generatedFrom.some((name) => name.startsWith('import:'))
             ? ` · ${payload.meta.generatedFrom

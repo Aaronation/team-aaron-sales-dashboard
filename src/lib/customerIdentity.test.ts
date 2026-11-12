@@ -1,8 +1,15 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { filterItems, groupBy, uniqueCustomers } from './aggregates'
+import { asp, filterItems, groupBy, monthlyTotals, sumRevenue, uniqueCustomers } from './aggregates'
 import { customerWorkingDayMom, followUpAccounts } from './chartSeries'
-import { WGAL_PARTNER_ALIASES, canonicalCustomerLabel, canonicalizeCustomers, customerMatchKey } from './partnerAliases'
+import { ingestRecords, mergeImportedItems } from './ingest'
+import {
+  WGAL_PARTNER_ALIASES,
+  canonicalCustomerLabel,
+  canonicalizeCustomers,
+  customerMatchKey,
+  isExcludedCustomer,
+} from './partnerAliases'
 import type { LineItem, SalesPayload } from './types'
 
 function line(
@@ -193,5 +200,70 @@ describe('customer whitespace and case identity', () => {
     expect(team.bars.some((bar) => bar.name === 'CTM Limited' || bar.name === '澳門電訊股份有限公司')).toBe(false)
     const kelvinChase = followUpAccounts(payload.lineItems, '2026-10', through, 'Kelvin Lai')
     expect(kelvinChase?.some((account) => customerMatchKey(account.name) === customerMatchKey('CTM'))).toBe(false)
+  })
+
+  it('drops 星馳通訊器材 from totals, top customers, and follow up', () => {
+    const items = [
+      line('2026-10-06', 100, '星馳通訊器材', { invoice: 'bad', quantity: 2 }),
+      line('2026-09-20', 80, '星馳 通訊器材', { invoice: 'bad-space', quantity: 1 }),
+      line('2026-10-06', 50, '星馳通訊', { invoice: 'similar', quantity: 1 }),
+      line('2026-10-06', 40, 'Harbour', { invoice: 'keep', quantity: 4 }),
+      line('2026-09-02', 30, 'Harbour', { invoice: 'keep-prior', quantity: 3 }),
+    ]
+    expect(isExcludedCustomer('星馳通訊器材')).toBe(true)
+    expect(isExcludedCustomer('星馳\u3000通訊器材')).toBe(true)
+    expect(isExcludedCustomer('星馳通訊')).toBe(false)
+    expect(isExcludedCustomer('Harbour')).toBe(false)
+
+    const kept = canonicalizeCustomers(items)
+    expect(kept.map((row) => row.invoice)).toEqual(['similar', 'keep', 'keep-prior'])
+    expect(sumRevenue(kept)).toBe(120)
+    expect(monthlyTotals(kept).find((month) => month.monthKey === '2026-10')?.revenue).toBe(90)
+    expect(asp(kept.filter((row) => row.date?.startsWith('2026-10')))).toBe(90 / 5)
+    expect(groupBy(kept, (row) => row.customer).map((row) => row.name)).toEqual(['Harbour', '星馳通訊'])
+
+    const mom = customerWorkingDayMom(items, '2026-10', '2026-10-18')
+    expect(mom.bars.map((bar) => bar.name)).toEqual(['星馳通訊', 'Harbour'])
+    expect(mom.bars.find((bar) => bar.name === 'Harbour')).toMatchObject({ current: 40, prior: 30 })
+    const chase = followUpAccounts(items, '2026-10', '2026-10-18', 'Aaron Chang')
+    expect(chase?.some((account) => isExcludedCustomer(account.name))).toBe(false)
+    expect(chase).toEqual([])
+
+    const loaded = ingestRecords([
+      {
+        date: '2026-10-06',
+        totalAmount: 10,
+        customer: '星馳通訊器材',
+        invoice: 'X',
+        salesperson: 'Aaron Chang',
+      },
+      {
+        date: '2026-10-06',
+        totalAmount: 20,
+        customer: 'Harbour',
+        invoice: 'H',
+        salesperson: 'Aaron Chang',
+      },
+    ])
+    expect(loaded.lineItems.map((row) => row.invoice)).toEqual(['H'])
+
+    const merged = mergeImportedItems(
+      [
+        line('2026-10-01', 5, '星馳通訊器材', { invoice: 'OLD' }),
+        line('2026-10-02', 15, 'Harbour', { invoice: 'KEEP' }),
+      ],
+      [line('2026-10-03', 8, '星馳 通訊器材', { invoice: 'NEW' })],
+      'merge',
+    )
+    expect(merged.lineItems.map((row) => row.invoice)).toEqual(['KEEP'])
+    const replaced = mergeImportedItems(
+      [line('2026-10-02', 15, 'Harbour', { invoice: 'KEEP' })],
+      [
+        line('2026-10-04', 9, '星馳通訊器材', { invoice: 'DROP' }),
+        line('2026-10-04', 11, 'Harbour', { invoice: 'STAY' }),
+      ],
+      'replace',
+    )
+    expect(replaced.lineItems.map((row) => row.invoice)).toEqual(['STAY'])
   })
 })
