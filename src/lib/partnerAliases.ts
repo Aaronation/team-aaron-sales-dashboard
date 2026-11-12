@@ -168,11 +168,39 @@ export const WGAL_PARTNER_ALIASES: Record<string, string> = {
 }
 
 /**
+ * Named accounts Aaron has called the same customer. This is not a rule that
+ * every "X" and "X Limited" match. Other legal-form suffixes stay separate.
+ */
+const CUSTOMER_ALIAS_GROUPS: readonly { label: string; names: readonly string[] }[] = [
+  {
+    label: 'CTM',
+    names: ['CTM', 'CTM Limited', '澳門電訊股份有限公司'],
+  },
+]
+
+function whitespaceCaseKey(name: string): string {
+  return name.replace(/\s+/g, '').toLowerCase()
+}
+
+const aliasLabelByKey = new Map<string, string>()
+for (const group of CUSTOMER_ALIAS_GROUPS) {
+  aliasLabelByKey.set(whitespaceCaseKey(group.label), group.label)
+  for (const name of group.names) aliasLabelByKey.set(whitespaceCaseKey(name), group.label)
+}
+
+/**
  * Identity for customer labels. Whitespace, including full-width spaces, and
- * letter case do not make a second customer. "CTM" and "CTM Limited" stay apart.
+ * letter case do not make a second customer. Named alias groups, such as CTM,
+ * share one key. "Something" and "Something Limited" stay apart.
  */
 export function customerMatchKey(name: string): string {
-  return name.replace(/\s+/g, '').toLowerCase()
+  const base = whitespaceCaseKey(name)
+  const alias = aliasLabelByKey.get(base)
+  return alias ? whitespaceCaseKey(alias) : base
+}
+
+function aliasLabel(name: string): string | null {
+  return aliasLabelByKey.get(whitespaceCaseKey(name)) ?? null
 }
 
 function readableCustomerScore(name: string): number {
@@ -185,8 +213,12 @@ function readableCustomerScore(name: string): number {
   return score
 }
 
-/** One display label. A spaced form wins over a glued form when both are present. */
+/** One display label. A named alias uses its short name. Otherwise a spaced form wins. */
 export function canonicalCustomerLabel(names: readonly string[]): string {
+  for (const raw of names) {
+    const alias = aliasLabel(raw)
+    if (alias) return alias
+  }
   const counts = new Map<string, number>()
   for (const raw of names) {
     const name = raw.trim()

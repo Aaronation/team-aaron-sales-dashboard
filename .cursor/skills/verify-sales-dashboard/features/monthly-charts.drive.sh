@@ -40,6 +40,10 @@ V=(node "$ROOT/.cursor/skills/verify-sales-dashboard/helpers/verify.mjs")
 "${V[@]}" expect-value --label "Salesperson" --value "Kelvin Lai"
 "${V[@]}" expect-text --text "Lancer" --scope "figure:Kelvin top customers · Oct 2026"
 "${V[@]}" expect-text --text "Last month" --scope "figure:Kelvin top customers · Oct 2026"
+"${V[@]}" expect-text --text "CTM" --scope "figure:Kelvin top customers · Oct 2026"
+"${V[@]}" expect-count --text "CTM" --scope "figure:Kelvin top customers · Oct 2026" --count 1
+"${V[@]}" expect-absent --text "CTM Limited" --scope "figure:Kelvin top customers · Oct 2026"
+"${V[@]}" expect-absent --text "澳門電訊" --scope "figure:Kelvin top customers · Oct 2026"
 "${V[@]}" expect-absent --text "Vision" --scope "figure:Kelvin top customers · Oct 2026"
 "${V[@]}" screenshot --name month-customers-kelvin --scope "figure:Kelvin top customers · Oct 2026"
 "${V[@]}" expect-text --text "China Telecom (Macau)" --scope "figure:Follow up · Oct 2026 · 18 accounts"
@@ -50,6 +54,8 @@ V=(node "$ROOT/.cursor/skills/verify-sales-dashboard/helpers/verify.mjs")
 "${V[@]}" expect-text --text "Not yet" --scope "figure:Follow up · Oct 2026 · 18 accounts"
 "${V[@]}" expect-absent --text "Same salesperson filter" --scope "figure:Follow up · Oct 2026 · 18 accounts"
 "${V[@]}" expect-absent --text "In-Town" --scope "figure:Follow up · Oct 2026 · 18 accounts"
+"${V[@]}" expect-absent --text "CTM" --scope "figure:Follow up · Oct 2026 · 18 accounts"
+"${V[@]}" expect-absent --text "澳門電訊" --scope "figure:Follow up · Oct 2026 · 18 accounts"
 "${V[@]}" screenshot --name month-follow-up-kelvin --scope css:.monthly__follow
 "${V[@]}" expect-text --text "Kelvin" --scope "figure:Kelvin top product models · Oct 2026"
 "${V[@]}" expect-absent --text "Aaron" --scope "figure:Kelvin top product models · Oct 2026"

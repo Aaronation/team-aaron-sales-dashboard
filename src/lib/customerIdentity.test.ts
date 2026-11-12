@@ -40,7 +40,7 @@ describe('customer whitespace and case identity', () => {
     expect(customerMatchKey('YOHO\u3000友和')).toBe(customerMatchKey('yoho 友和'))
     expect(customerMatchKey("YAN'S COMPUTER")).toBe(customerMatchKey("Yan's Computer"))
     expect(customerMatchKey('  節拍')).toBe(customerMatchKey('節拍'))
-    expect(customerMatchKey('CTM')).not.toBe(customerMatchKey('CTM Limited'))
+    expect(customerMatchKey('Something')).not.toBe(customerMatchKey('Something Limited'))
     expect(customerMatchKey('Vision')).not.toBe(customerMatchKey('Vision computer'))
   })
 
@@ -48,8 +48,7 @@ describe('customer whitespace and case identity', () => {
     expect(canonicalCustomerLabel(['YOHO友和', 'YOHO友和', 'YOHO 友和'])).toBe('YOHO 友和')
     expect(canonicalCustomerLabel(["YAN'S COMPUTER", "Yan's Computer"])).toBe("Yan's Computer")
     expect(canonicalCustomerLabel(['  節拍', '節拍'])).toBe('節拍')
-    expect(canonicalCustomerLabel(['CTM', 'CTM Limited'])).not.toBe('CTM')
-    expect(canonicalCustomerLabel(['CTM Limited'])).toBe('CTM Limited')
+    expect(canonicalCustomerLabel(['Something Limited'])).toBe('Something Limited')
   })
 
   it('combines the YOHO pair on the chart and keeps it off follow-up when this period has sales', () => {
@@ -59,11 +58,11 @@ describe('customer whitespace and case identity', () => {
       line('2026-09-02', 25, 'YOHO友和', { invoice: 'prior-glued', quantity: 1 }),
       line('2026-09-03', 15, 'yoho\u3000友和', { invoice: 'prior-wide', quantity: 1 }),
       line('2026-10-06', 500, 'CTM', { invoice: 'ctm' }),
-      line('2026-10-06', 80, 'CTM Limited', { invoice: 'ctm-ltd' }),
+      line('2026-10-06', 80, 'Something Limited', { invoice: 'some-ltd' }),
       line('2026-09-02', 9, 'Harbour', { invoice: 'harbour-prior' }),
     ]
     const mom = customerWorkingDayMom(items, '2026-10', '2026-10-18')
-    expect(mom.bars.map((bar) => bar.name)).toEqual(['CTM', 'YOHO 友和', 'CTM Limited'])
+    expect(mom.bars.map((bar) => bar.name)).toEqual(['CTM', 'YOHO 友和', 'Something Limited'])
     expect(mom.bars.find((bar) => bar.name === 'YOHO 友和')).toMatchObject({
       current: 140,
       prior: 40,
@@ -74,7 +73,7 @@ describe('customer whitespace and case identity', () => {
     expect(groupBy(canonicalizeCustomers(items), (row) => row.customer).map((row) => row.name)).toEqual([
       'CTM',
       'YOHO 友和',
-      'CTM Limited',
+      'Something Limited',
       'Harbour',
     ])
 
@@ -91,6 +90,47 @@ describe('customer whitespace and case identity', () => {
     expect(followUpAccounts(items, '2026-10', '2026-10-18', 'Aaron Chang')).toEqual([
       { name: 'YOHO 友和', prior: 42 },
     ])
+  })
+
+  it('collapses Aaron’s CTM labels and leaves a different Limited name distinct', () => {
+    const items = [
+      line('2026-10-06', 100, 'CTM', { invoice: 'ctm', quantity: 2 }),
+      line('2026-10-08', 40, 'CTM Limited', { invoice: 'ctm-ltd', quantity: 1 }),
+      line('2026-10-09', 10, '澳門電訊股份有限公司', { invoice: 'ctm-zh', quantity: 1 }),
+      line('2026-09-02', 25, 'CTM Limited', { invoice: 'ctm-prior', quantity: 1 }),
+      line('2026-09-03', 15, '澳門電訊股份有限公司', { invoice: 'ctm-zh-prior', quantity: 5 }),
+      line('2026-10-06', 70, 'Something', { invoice: 'some', quantity: 1 }),
+      line('2026-10-07', 30, 'Something Limited', { invoice: 'some-ltd', quantity: 1 }),
+      line('2026-09-02', 8, 'Something Limited', { invoice: 'some-prior', quantity: 1 }),
+    ]
+    expect(customerMatchKey('CTM')).toBe(customerMatchKey('CTM Limited'))
+    expect(customerMatchKey('CTM')).toBe(customerMatchKey('澳門電訊股份有限公司'))
+    expect(customerMatchKey('ctm  limited')).toBe(customerMatchKey('CTM'))
+    expect(customerMatchKey('Something')).not.toBe(customerMatchKey('Something Limited'))
+    expect(canonicalCustomerLabel(['CTM Limited', '澳門電訊股份有限公司'])).toBe('CTM')
+    expect(canonicalCustomerLabel(['Something Limited'])).toBe('Something Limited')
+
+    const mom = customerWorkingDayMom(items, '2026-10', '2026-10-18')
+    expect(mom.bars.map((bar) => bar.name)).toEqual(['CTM', 'Something', 'Something Limited'])
+    expect(mom.bars.find((bar) => bar.name === 'CTM')).toMatchObject({
+      current: 150,
+      prior: 40,
+      asp: 150 / 4,
+      priorAsp: 40 / 6,
+    })
+    expect(uniqueCustomers(items)).toBe(3)
+    expect(followUpAccounts(items, '2026-10', '2026-10-18', 'Aaron Chang')).toEqual([])
+
+    const priorOnly = [
+      line('2026-09-02', 50, 'CTM Limited', { invoice: 'only-ltd' }),
+      line('2026-09-04', 20, '澳門電訊股份有限公司', { invoice: 'only-zh' }),
+      line('2026-09-04', 7, 'Something Limited', { invoice: 'only-some' }),
+    ]
+    expect(followUpAccounts(priorOnly, '2026-10', '2026-10-18', 'Aaron Chang')).toEqual([
+      { name: 'CTM', prior: 70 },
+      { name: 'Something Limited', prior: 7 },
+    ])
+    expect(WGAL_PARTNER_ALIASES['澳門電訊股份有限公司']).toBe('CTM')
   })
 
   it('finds either YOHO spelling from search and leaves the wGAL map in place', () => {
@@ -141,9 +181,17 @@ describe('customer whitespace and case identity', () => {
 
     const aaron = followUpAccounts(payload.lineItems, '2026-10', through, 'Aaron Chang')
     expect(aaron?.some((account) => customerMatchKey(account.name) === customerMatchKey('YOHO友和'))).toBe(false)
-    const ctm = team.bars.find((bar) => bar.name === 'CTM')
-    const ctmLimited = team.bars.find((bar) => bar.name === 'CTM Limited')
-    expect(ctm?.name).toBe('CTM')
-    expect(ctmLimited).toBeUndefined()
+
+    const kelvinItems = payload.lineItems.filter((row) => row.salesperson === 'Kelvin Lai')
+    const kelvinMom = customerWorkingDayMom(kelvinItems, '2026-10', through, 50)
+    const ctmBars = kelvinMom.bars.filter((bar) => customerMatchKey(bar.name) === customerMatchKey('CTM'))
+    expect(ctmBars).toHaveLength(1)
+    expect(ctmBars[0]?.name).toBe('CTM')
+    expect(ctmBars[0]?.current).toBeCloseTo(90450, 6)
+    expect(ctmBars[0]?.prior).toBeCloseTo(332790, 6)
+    expect(team.bars.filter((bar) => customerMatchKey(bar.name) === customerMatchKey('CTM'))).toHaveLength(1)
+    expect(team.bars.some((bar) => bar.name === 'CTM Limited' || bar.name === '澳門電訊股份有限公司')).toBe(false)
+    const kelvinChase = followUpAccounts(payload.lineItems, '2026-10', through, 'Kelvin Lai')
+    expect(kelvinChase?.some((account) => customerMatchKey(account.name) === customerMatchKey('CTM'))).toBe(false)
   })
 })
