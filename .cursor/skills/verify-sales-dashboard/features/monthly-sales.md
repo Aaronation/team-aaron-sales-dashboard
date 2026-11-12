@@ -10,7 +10,7 @@ Monthly sales shows each calendar month's total sell-out for the lines currently
 - `month-empty` shows `No sales in the current filters.` when a search or department matches nothing.
 - `month-days-mom` draws this month’s working days as a solid line and last month on the same working-day index as a dashed line.
 - `month-customers-mom` draws two bars per top customer for month-to-date through the selected week: this period, and last month on the same working-day count. Both bars follow the salesperson filter. Membership stays customers with sell-out in this period.
-- `month-follow-up` sits beside that chart only when one salesperson is selected. It lists every customer with sell-out in last month’s same working-day window and none so far this period, ranked by that prior amount, with no top-10 cap. All reps leaves the chart full width and shows no list.
+- `month-follow-up` sits beside that chart only when one salesperson is selected. It lists every customer with sell-out in last month’s same working-day window and none so far this period, ranked by that prior amount, with no top-10 cap. Names are the full customer label and wrap; they are not cut at 24 characters. All reps leaves the chart full width and shows no list.
 - `month-models-reps` stacks each top model by salesperson for that same month-to-date window. Aaron, Kelvin, and Kenny use the sell-out pie colors.
 
 ## How to get to it (user POV)

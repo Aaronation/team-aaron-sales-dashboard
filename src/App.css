@@ -422,7 +422,8 @@
 
 .follow-up__name {
   min-width: 0;
-  overflow-wrap: anywhere;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 
 .follow-up__amount {

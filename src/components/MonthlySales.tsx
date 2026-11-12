@@ -15,6 +15,7 @@ import {
 import {
   averageSellingPrice,
   formatAsp,
+  displayCustomer,
   formatMoney,
   formatMonthLabel,
   MONTHLY_TEAM_TARGETS,
@@ -155,24 +156,19 @@ function FollowUpList({ shareLabel, accounts }: { shareLabel: string; accounts: 
       </figcaption>
       <p className="monthly__caption">
         Bought in last month’s same working-day window, $0 so far this period. Ranked by last
-        month’s amount. Same salesperson filter as the rest of the dashboard.
+        month’s amount.
       </p>
       {accounts.length === 0 ? (
         <p className="monthly__empty">No accounts to chase in this window.</p>
       ) : (
         <ul className="follow-up__list">
-          {accounts.map((account) => {
-            const label = tickLabel(account.name, 24)
-            return (
-              <li key={account.name} className="follow-up__row">
-                <span className="follow-up__name" title={label === account.name ? undefined : account.name}>
-                  {label}
-                </span>
-                <span className="follow-up__amount">{formatMoney(Math.round(account.prior))}</span>
-                <span className="follow-up__pill">Not yet</span>
-              </li>
-            )
-          })}
+          {accounts.map((account) => (
+            <li key={account.name} className="follow-up__row">
+              <span className="follow-up__name">{displayCustomer(account.name)}</span>
+              <span className="follow-up__amount">{formatMoney(Math.round(account.prior))}</span>
+              <span className="follow-up__pill">Not yet</span>
+            </li>
+          ))}
         </ul>
       )}
     </figure>
