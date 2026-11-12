@@ -65,15 +65,19 @@ V=(node "$ROOT/.cursor/skills/verify-sales-dashboard/helpers/verify.mjs")
 "${V[@]}" expect-absent --text "Lancer" --scope "figure:Aaron top customers · Oct 2026"
 "${V[@]}" expect-absent --text "Megatech" --scope "figure:Aaron top customers · Oct 2026"
 "${V[@]}" expect-absent --text "In-Town" --scope "figure:Aaron top customers · Oct 2026"
+"${V[@]}" expect-text --text "YOHO 友和" --scope "figure:Aaron top customers · Oct 2026"
+"${V[@]}" expect-absent --text "YOHO友和" --scope "figure:Aaron top customers · Oct 2026"
+"${V[@]}" expect-count --text "YOHO 友和" --scope "figure:Aaron top customers · Oct 2026" --count 1
 "${V[@]}" screenshot --name month-customers-aaron --scope "figure:Aaron top customers · Oct 2026"
-"${V[@]}" expect-text --text "In-Town" --scope "figure:Follow up · Oct 2026 · 6 accounts"
-"${V[@]}" expect-text --text "訊購貿易公司 Xungou Trading" --scope "figure:Follow up · Oct 2026 · 6 accounts"
-"${V[@]}" expect-text --text 'HK$27,590' --scope "figure:Follow up · Oct 2026 · 6 accounts"
-"${V[@]}" expect-text --text 'HK$12,000' --scope "figure:Follow up · Oct 2026 · 6 accounts"
-"${V[@]}" expect-absent --text "Same salesperson filter" --scope "figure:Follow up · Oct 2026 · 6 accounts"
-"${V[@]}" expect-text --text "Not yet" --scope "figure:Follow up · Oct 2026 · 6 accounts"
-"${V[@]}" expect-absent --text "No accounts to chase in this window." --scope "figure:Follow up · Oct 2026 · 6 accounts"
-"${V[@]}" expect-absent --text "China Telecom (Macau)" --scope "figure:Follow up · Oct 2026 · 6 accounts"
+"${V[@]}" expect-text --text "In-Town" --scope "figure:Follow up · Oct 2026 · 3 accounts"
+"${V[@]}" expect-text --text "訊購貿易公司 Xungou Trading" --scope "figure:Follow up · Oct 2026 · 3 accounts"
+"${V[@]}" expect-text --text 'HK$27,590' --scope "figure:Follow up · Oct 2026 · 3 accounts"
+"${V[@]}" expect-text --text 'HK$12,000' --scope "figure:Follow up · Oct 2026 · 3 accounts"
+"${V[@]}" expect-absent --text "YOHO" --scope "figure:Follow up · Oct 2026 · 3 accounts"
+"${V[@]}" expect-absent --text "Same salesperson filter" --scope "figure:Follow up · Oct 2026 · 3 accounts"
+"${V[@]}" expect-text --text "Not yet" --scope "figure:Follow up · Oct 2026 · 3 accounts"
+"${V[@]}" expect-absent --text "No accounts to chase in this window." --scope "figure:Follow up · Oct 2026 · 3 accounts"
+"${V[@]}" expect-absent --text "China Telecom (Macau)" --scope "figure:Follow up · Oct 2026 · 3 accounts"
 "${V[@]}" screenshot --name month-follow-up-aaron --scope css:.monthly__follow
 "${V[@]}" aria --name month-follow-up-aaron --scope css:.monthly__follow
 

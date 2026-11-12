@@ -43,6 +43,7 @@ import { mtdWorkingDays } from './lib/hkHolidays'
 import { initialFilters, reconcileFilters } from './lib/filters'
 import { ALL_REPS_SKU_BAR, customerBarColor } from './lib/palette'
 import { mergeImportedItems, type ImportMode } from './lib/ingest'
+import { canonicalizeCustomers } from './lib/partnerAliases'
 import { readImportFile, type LoadedImport } from './lib/readImportFile'
 import type { Filters, LineItem, SalesPayload } from './lib/types'
 import {
@@ -141,6 +142,10 @@ export default function App() {
     () => (payload ? listWeekKeys(payload.lineItems) : []),
     [payload],
   )
+  const canonicalLines = useMemo(
+    () => (payload ? canonicalizeCustomers(payload.lineItems) : []),
+    [payload],
+  )
   const salespeople = useMemo(
     () => (payload ? uniqueSorted(payload.lineItems.map((r) => r.salesperson)) : []),
     [payload],
@@ -163,23 +168,23 @@ export default function App() {
 
   const thisWeek = useMemo(() => {
     if (!payload || !filters) return []
-    return filterItems(payload.lineItems, filters)
-  }, [payload, filters])
+    return filterItems(canonicalLines, filters)
+  }, [canonicalLines, filters, payload])
 
   const priorPeriod = useMemo(() => {
     if (!payload || !filters || !priorRange) return []
     return filterByDateRange(
-      payload.lineItems,
+      canonicalLines,
       filters,
       priorRange.start,
       priorRange.end,
     )
-  }, [payload, filters, priorRange])
+  }, [canonicalLines, filters, payload, priorRange])
 
   const mtd = useMemo(() => {
     if (!payload || !filters || filters.weekKey === 'all') return []
-    return filterMtdThroughWeek(payload.lineItems, filters, filters.weekKey)
-  }, [payload, filters])
+    return filterMtdThroughWeek(canonicalLines, filters, filters.weekKey)
+  }, [canonicalLines, filters, payload])
 
   const bySp = useMemo(
     () => groupByWithPrior(thisWeek, priorPeriod, (r) => r.salesperson),
@@ -197,8 +202,8 @@ export default function App() {
 
   const monthScoped = useMemo(() => {
     if (!payload || !filters) return []
-    return filterIgnoringWeek(payload.lineItems, filters)
-  }, [payload, filters])
+    return filterIgnoringWeek(canonicalLines, filters)
+  }, [canonicalLines, filters, payload])
   const months = useMemo(() => monthlyTotals(monthScoped), [monthScoped])
 
   const shareMonthKey = review?.monthKey ?? null
@@ -235,7 +240,7 @@ export default function App() {
   const shareRows = useMemo(() => {
     if (!payload || !filters) return []
     const monthKey = filters.weekKey === 'all' ? null : reviewWindow(filters.weekKey)?.monthKey
-    const base = filterIgnoringWeek(payload.lineItems, {
+    const base = filterIgnoringWeek(canonicalLines, {
       weekKey: filters.weekKey,
       salesperson: 'all',
       department: filters.department,
@@ -243,18 +248,18 @@ export default function App() {
     })
     if (!monthKey) return base
     return base.filter((row) => row.date != null && monthKeyFromDate(row.date) === monthKey)
-  }, [payload, filters])
+  }, [canonicalLines, filters, payload])
   const shares = useMemo(() => sellOutShares(shareRows), [shareRows])
   const repRows = useMemo(() => {
     if (!payload || !filters) return []
-    const base = filterIgnoringWeek(payload.lineItems, {
+    const base = filterIgnoringWeek(canonicalLines, {
       weekKey: filters.weekKey,
       salesperson: 'all',
       department: filters.department,
       query: filters.query,
     })
     return repMonthAchievements(base)
-  }, [payload, filters])
+  }, [canonicalLines, filters, payload])
 
   async function handleImport(file: File, mode: ImportMode) {
     if (!payload || importingRef.current) return

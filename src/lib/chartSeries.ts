@@ -9,6 +9,7 @@ import {
   shortName,
 } from './aggregates'
 import { isWorkingDay } from './hkHolidays'
+import { canonicalizeCustomers } from './partnerAliases'
 import type { LineItem } from './types'
 
 export type MonthDayPoint = {
@@ -198,8 +199,9 @@ export function customerWorkingDayMom(
   throughDate: string,
   limit = 10,
 ): CustomerMom {
+  const named = canonicalizeCustomers(items)
   const span = mtdComparisonSpan(monthKey, throughDate)
-  const hasPrior = items.some(
+  const hasPrior = named.some(
     (row) => row.date != null && monthKeyFromDate(row.date) === span.priorMonthKey,
   )
   const currentTotals = new Map<string, number>()
@@ -207,7 +209,7 @@ export function customerWorkingDayMom(
   const currentQty = new Map<string, number>()
   const priorQty = new Map<string, number>()
   const byWeek = new Map<string, Map<string, number>>()
-  for (const row of items) {
+  for (const row of named) {
     if (!row.date || !row.customer) continue
     const amount = row.totalAmount || 0
     const quantity = row.quantity || 0
@@ -270,10 +272,11 @@ export function followUpAccounts(
   salesperson: string,
 ): FollowUpAccount[] | null {
   if (salesperson === 'all') return null
+  const named = canonicalizeCustomers(items)
   const span = mtdComparisonSpan(monthKey, throughDate)
   const currentTotals = new Map<string, number>()
   const priorTotals = new Map<string, number>()
-  for (const row of items) {
+  for (const row of named) {
     if (!row.date || !row.customer || row.salesperson !== salesperson) continue
     const amount = row.totalAmount || 0
     if (inMonthThrough(row.date, monthKey, span.throughDate)) {

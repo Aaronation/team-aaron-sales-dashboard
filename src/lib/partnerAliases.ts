@@ -167,3 +167,59 @@ export const WGAL_PARTNER_ALIASES: Record<string, string> = {
   "駿馬CM": "駿馬CM",
 }
 
+/**
+ * Identity for customer labels. Whitespace, including full-width spaces, and
+ * letter case do not make a second customer. "CTM" and "CTM Limited" stay apart.
+ */
+export function customerMatchKey(name: string): string {
+  return name.replace(/\s+/g, '').toLowerCase()
+}
+
+function readableCustomerScore(name: string): number {
+  const trimmed = name.trim()
+  let score = 0
+  if (/[^\s]\s+[^\s]/.test(trimmed)) score += 4
+  if (/[^\s] [^\s]/.test(trimmed)) score += 2
+  const letters = trimmed.match(/[A-Za-z]/g)
+  if (letters?.some((letter) => letter.toLowerCase() !== letter)) score += 1
+  return score
+}
+
+/** One display label. A spaced form wins over a glued form when both are present. */
+export function canonicalCustomerLabel(names: readonly string[]): string {
+  const counts = new Map<string, number>()
+  for (const raw of names) {
+    const name = raw.trim()
+    if (!name) continue
+    counts.set(name, (counts.get(name) ?? 0) + 1)
+  }
+  const ranked = [...counts.entries()].sort((a, b) => {
+    const byScore = readableCustomerScore(b[0]) - readableCustomerScore(a[0])
+    if (byScore !== 0) return byScore
+    if (a[1] !== b[1]) return b[1] - a[1]
+    return a[0].localeCompare(b[0])
+  })
+  return ranked[0]?.[0] ?? ''
+}
+
+/** Copy lines so every customer group uses one label. Stored text is left unchanged. */
+export function canonicalizeCustomers<T extends { customer: string | null }>(items: readonly T[]): T[] {
+  const byKey = new Map<string, string[]>()
+  for (const row of items) {
+    if (!row.customer) continue
+    const key = customerMatchKey(row.customer)
+    if (!key) continue
+    const list = byKey.get(key)
+    if (list) list.push(row.customer)
+    else byKey.set(key, [row.customer])
+  }
+  const labels = new Map<string, string>()
+  for (const [key, names] of byKey) labels.set(key, canonicalCustomerLabel(names))
+  return items.map((row) => {
+    if (!row.customer) return row
+    const label = labels.get(customerMatchKey(row.customer))
+    if (!label || label === row.customer) return row
+    return { ...row, customer: label }
+  })
+}
+

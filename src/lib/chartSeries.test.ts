@@ -13,6 +13,7 @@ import {
 } from './aggregates'
 import { mtdWorkingDays } from './hkHolidays'
 import { AMBER, CLAY, CREAM, SAGE, TAUPE, customerWeekFill } from './palette'
+import { customerMatchKey } from './partnerAliases'
 import {
   customerWorkingDayMom,
   followUpAccounts,
@@ -279,7 +280,8 @@ describe('customer working-day MoM and model reps', () => {
     const customerLines = (name: string, salesperson: string | null, start: string, end: string) =>
       payload.lineItems.filter(
         (row) =>
-          row.customer === name &&
+          row.customer != null &&
+          customerMatchKey(row.customer) === customerMatchKey(name) &&
           (salesperson == null || row.salesperson === salesperson) &&
           row.date != null &&
           row.date >= start &&
@@ -433,9 +435,6 @@ describe('follow-up accounts', () => {
       { name: 'In-Town', prior: 27590 },
       { name: '訊購貿易公司 Xungou Trading Company', prior: 12000 },
       { name: '淳泰集團', prior: 8931 },
-      { name: "Yan's Computer", prior: 8188 },
-      { name: 'OUTLET EXPRESS', prior: 5914 },
-      { name: 'YOHO 友和', prior: 478 },
     ])
     expect(kelvin).toEqual([
       { name: 'China Telecom (Macau)', prior: 53000 },
@@ -447,7 +446,7 @@ describe('follow-up accounts', () => {
       { name: '百樂通訊', prior: 6029 },
       { name: 'Pegasus飛馬Pegasus Computer Limited', prior: 5171 },
       { name: 'TOFU SHOP LIMITED', prior: 4700 },
-      { name: '達意電腦 ', prior: 3375.5 },
+      { name: '達意電腦', prior: 3375.5 },
       { name: 'CORNER PHONE LIMITED', prior: 3135 },
       { name: '得寶 Double', prior: 2506 },
       { name: '壹億數碼有限公司', prior: 2175 },
@@ -475,7 +474,8 @@ describe('follow-up accounts', () => {
       payload.lineItems
         .filter(
           (row) =>
-            row.customer === name &&
+            row.customer != null &&
+          customerMatchKey(row.customer) === customerMatchKey(name) &&
             row.salesperson === salesperson &&
             row.date != null &&
             row.date >= start &&

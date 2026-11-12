@@ -1,4 +1,5 @@
 import { isWorkingDay } from './hkHolidays'
+import { customerMatchKey } from './partnerAliases'
 import type { Filters, LineItem, Targets } from './types'
 
 /** 2026 team sell-out targets (HKD), from Aaron’s monthly target sheet. */
@@ -139,24 +140,40 @@ export function listWeekKeys(items: LineItem[]): string[] {
   return [...set].sort()
 }
 
+function matchesCustomerQuery(query: string, customer: string | null): boolean {
+  const queryKey = customerMatchKey(query)
+  if (!queryKey) return false
+  return customerMatchKey(customer ?? '').includes(queryKey)
+}
+
+function matchesTextQuery(
+  query: string,
+  parts: (string | null | undefined)[],
+  customer: string | null,
+): boolean {
+  const q = query.trim().toLowerCase()
+  if (!q) return true
+  const hay = parts.filter(Boolean).join(' ').toLowerCase()
+  if (hay.includes(q)) return true
+  return matchesCustomerQuery(query, customer)
+}
+
 function matchesDimFilters(row: LineItem, f: Filters): boolean {
   if (f.salesperson !== 'all' && row.salesperson !== f.salesperson) return false
   if (f.department !== 'all' && row.department !== f.department) return false
-  const q = f.query.trim().toLowerCase()
-  if (!q) return true
-  const hay = [
-    row.invoice,
+  return matchesTextQuery(
+    f.query,
+    [
+      row.invoice,
+      row.customer,
+      row.tradingPartner,
+      row.sku,
+      row.productModel,
+      row.productName,
+      row.salesperson,
+    ],
     row.customer,
-    row.tradingPartner,
-    row.sku,
-    row.productModel,
-    row.productName,
-    row.salesperson,
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase()
-  return hay.includes(q)
+  )
 }
 
 export function filterItems(items: LineItem[], f: Filters): LineItem[] {
@@ -209,7 +226,10 @@ export function monthlyTotals(items: LineItem[]): MonthTotal[] {
     cur.revenue += row.totalAmount || 0
     cur.quantity += row.quantity || 0
     if (row.invoice) cur.invoiceSet.add(row.invoice)
-    if (row.customer) cur.customerSet.add(row.customer)
+    if (row.customer) {
+      const key = customerMatchKey(row.customer)
+      if (key) cur.customerSet.add(key)
+    }
   }
   return [...map.values()]
     .map(({ customerSet, invoiceSet, ...rest }) => ({
@@ -387,19 +407,17 @@ export function filterByDateRange(
 export function filterMtdThroughWeek(items: LineItem[], f: Filters, weekKey: string): LineItem[] {
   const window = reviewWindow(weekKey)
   if (!window) return []
-  const q = f.query.trim().toLowerCase()
   return items.filter((row) => {
     if (!row.date) return false
     if (monthKeyFromDate(row.date) !== window.monthKey) return false
     if (row.date > window.throughDate) return false
     if (f.salesperson !== 'all' && row.salesperson !== f.salesperson) return false
     if (f.department !== 'all' && row.department !== f.department) return false
-    if (!q) return true
-    const hay = [row.invoice, row.customer, row.sku, row.productModel, row.productName]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase()
-    return hay.includes(q)
+    return matchesTextQuery(
+      f.query,
+      [row.invoice, row.customer, row.sku, row.productModel, row.productName],
+      row.customer,
+    )
   })
 }
 
@@ -429,7 +447,13 @@ export function asp(items: LineItem[]): number | null {
 }
 
 export function uniqueCustomers(items: LineItem[]): number {
-  return new Set(items.map((r) => r.customer).filter(Boolean)).size
+  const keys = new Set<string>()
+  for (const row of items) {
+    if (!row.customer) continue
+    const key = customerMatchKey(row.customer)
+    if (key) keys.add(key)
+  }
+  return keys.size
 }
 
 export function uniqueInvoices(items: LineItem[]): number {
