@@ -28,6 +28,7 @@ import {
   orderSeriesLikeShares,
   segmentKey,
   type CustomerMom,
+  type FollowUpAccount,
   type MonthDayComparison,
   type StackBar,
   type StackSeries,
@@ -142,6 +143,128 @@ function CustomerTick({
   )
 }
 
+function accountCountLabel(count: number): string {
+  return `${count} ${count === 1 ? 'account' : 'accounts'}`
+}
+
+function FollowUpList({ shareLabel, accounts }: { shareLabel: string; accounts: FollowUpAccount[] }) {
+  return (
+    <figure className="chart-panel follow-up">
+      <figcaption>
+        {`Follow up · ${shareLabel}`}<span className="follow-up__count">{` · ${accountCountLabel(accounts.length)}`}</span>
+      </figcaption>
+      <p className="monthly__caption">
+        Bought in last month’s same working-day window, $0 so far this period. Ranked by last
+        month’s amount. Same salesperson filter as the rest of the dashboard.
+      </p>
+      {accounts.length === 0 ? (
+        <p className="monthly__empty">No accounts to chase in this window.</p>
+      ) : (
+        <ul className="follow-up__list">
+          {accounts.map((account) => {
+            const label = tickLabel(account.name, 24)
+            return (
+              <li key={account.name} className="follow-up__row">
+                <span className="follow-up__name" title={label === account.name ? undefined : account.name}>
+                  {label}
+                </span>
+                <span className="follow-up__amount">{formatMoney(Math.round(account.prior))}</span>
+                <span className="follow-up__pill">Not yet</span>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </figure>
+  )
+}
+
+function CustomerChart({
+  className,
+  customerTitle,
+  customerMom,
+  shareLabel,
+  mtdThroughLabel,
+  topCustomers,
+}: {
+  className: string
+  customerTitle: string
+  customerMom: CustomerMom | null
+  shareLabel: string
+  mtdThroughLabel: string | null
+  topCustomers: {
+    name: string
+    fullName: string
+    current: number
+    prior: number | null
+    asp: number | null
+    priorAsp: number | null
+    [segment: string]: string | number | null
+  }[]
+}) {
+  return (
+    <figure className={className}>
+      <figcaption>{customerTitle}</figcaption>
+      <p className="monthly__caption">
+        {customerMom?.hasPrior && customerMom.span.priorThroughDate
+          ? `This period stacks weeks from the start of ${shareLabel} through ${mtdThroughLabel} (${customerMom.span.workingDayCount} working days), compared with last month through ${customerMom.span.priorThroughDate.slice(5)}.`
+          : customerMom
+            ? `No ${customerMom.span.priorMonthLabel} lines are loaded, so this period stacks weeks from the start of ${shareLabel} through ${mtdThroughLabel} with no comparison bar.`
+            : 'Choose a review week to see month-to-date customers.'}
+      </p>
+      {topCustomers.length === 0 ? (
+        <p className="monthly__empty">No customers in {shareLabel}.</p>
+      ) : (
+        <>
+          <ul className="series-legend">
+            {(customerMom?.weeks ?? []).map((week, index) => (
+              <li key={week.key}>
+                <span className="series-legend__swatch" style={{ background: customerWeekFill(index) }} />
+                {week.label}
+              </li>
+            ))}
+            {customerMom?.hasPrior ? (
+              <li>
+                <span className="series-legend__swatch series-legend__swatch--muted" />
+                Last month
+              </li>
+            ) : null}
+          </ul>
+          <ResponsiveContainer width="100%" height={520}>
+            <BarChart data={topCustomers} layout="vertical" margin={{ left: 8, right: 16 }} barGap={2}>
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} horizontal={false} />
+              <XAxis type="number" tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} />
+              <YAxis type="category" dataKey="name" width={196} tick={CustomerTick} />
+              <Tooltip content={<MomTooltip />} />
+              {(customerMom?.weeks ?? []).map((week, index) => (
+                <Bar
+                  key={week.key}
+                  dataKey={segmentKey('week', week.key)}
+                  name={week.label}
+                  stackId="current"
+                  fill={customerWeekFill(index)}
+                  stroke={TAUPE}
+                  strokeWidth={1}
+                  isAnimationActive={false}
+                />
+              ))}
+              {customerMom?.hasPrior ? (
+                <Bar
+                  dataKey="prior"
+                  name="Last month"
+                  fill={OLIVE}
+                  fillOpacity={0.45}
+                  isAnimationActive={false}
+                />
+              ) : null}
+            </BarChart>
+          </ResponsiveContainer>
+        </>
+      )}
+    </figure>
+  )
+}
+
 type Props = {
   months: MonthTotal[]
   activeMonthKey: string | null
@@ -152,6 +275,7 @@ type Props = {
   repRows: RepAchievement[]
   dayComparison: MonthDayComparison | null
   customerMom: CustomerMom | null
+  followUp: FollowUpAccount[] | null
   modelStacks: { series: StackSeries[]; bars: StackBar[] }
   mtdThroughLabel: string | null
   salesperson: string
@@ -174,6 +298,7 @@ export function MonthlySales({
   repRows,
   dayComparison,
   customerMom,
+  followUp,
   modelStacks,
   mtdThroughLabel,
   salesperson,
@@ -421,65 +546,28 @@ export function MonthlySales({
         )}
       </figure>
 
-      <figure className="chart-panel chart-stack">
-        <figcaption>{customerTitle}</figcaption>
-        <p className="monthly__caption">
-          {customerMom?.hasPrior && customerMom.span.priorThroughDate
-            ? `This period stacks weeks from the start of ${shareLabel} through ${mtdThroughLabel} (${customerMom.span.workingDayCount} working days), compared with last month through ${customerMom.span.priorThroughDate.slice(5)}.`
-            : customerMom
-              ? `No ${customerMom.span.priorMonthLabel} lines are loaded, so this period stacks weeks from the start of ${shareLabel} through ${mtdThroughLabel} with no comparison bar.`
-              : 'Choose a review week to see month-to-date customers.'}
-        </p>
-        {topCustomers.length === 0 ? (
-          <p className="monthly__empty">No customers in {shareLabel}.</p>
-        ) : (
-          <>
-            <ul className="series-legend">
-              {(customerMom?.weeks ?? []).map((week, index) => (
-                <li key={week.key}>
-                  <span className="series-legend__swatch" style={{ background: customerWeekFill(index) }} />
-                  {week.label}
-                </li>
-              ))}
-              {customerMom?.hasPrior ? (
-                <li>
-                  <span className="series-legend__swatch series-legend__swatch--muted" />
-                  Last month
-                </li>
-              ) : null}
-            </ul>
-            <ResponsiveContainer width="100%" height={520}>
-              <BarChart data={topCustomers} layout="vertical" margin={{ left: 8, right: 16 }} barGap={2}>
-                <CartesianGrid strokeDasharray="3 3" stroke={GRID} horizontal={false} />
-                <XAxis type="number" tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} />
-                <YAxis type="category" dataKey="name" width={196} tick={CustomerTick} />
-                <Tooltip content={<MomTooltip />} />
-                {(customerMom?.weeks ?? []).map((week, index) => (
-                  <Bar
-                    key={week.key}
-                    dataKey={segmentKey('week', week.key)}
-                    name={week.label}
-                    stackId="current"
-                    fill={customerWeekFill(index)}
-                    stroke={TAUPE}
-                    strokeWidth={1}
-                    isAnimationActive={false}
-                  />
-                ))}
-                {customerMom?.hasPrior ? (
-                  <Bar
-                    dataKey="prior"
-                    name="Last month"
-                    fill={OLIVE}
-                    fillOpacity={0.45}
-                    isAnimationActive={false}
-                  />
-                ) : null}
-              </BarChart>
-            </ResponsiveContainer>
-          </>
-        )}
-      </figure>
+      {followUp != null ? (
+        <div className="monthly__follow">
+          <CustomerChart
+            className="chart-panel"
+            customerTitle={customerTitle}
+            customerMom={customerMom}
+            shareLabel={shareLabel}
+            mtdThroughLabel={mtdThroughLabel}
+            topCustomers={topCustomers}
+          />
+          <FollowUpList shareLabel={shareLabel} accounts={followUp} />
+        </div>
+      ) : (
+        <CustomerChart
+          className="chart-panel chart-stack"
+          customerTitle={customerTitle}
+          customerMom={customerMom}
+          shareLabel={shareLabel}
+          mtdThroughLabel={mtdThroughLabel}
+          topCustomers={topCustomers}
+        />
+      )}
 
       <figure className="chart-panel chart-stack">
         <figcaption>{modelTitle}</figcaption>

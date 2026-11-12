@@ -37,7 +37,7 @@ import {
   reviewWindow,
   weekLabel,
 } from './lib/aggregates'
-import { customerWorkingDayMom, modelRepStacks, monthDailyComparison } from './lib/chartSeries'
+import { customerWorkingDayMom, followUpAccounts, modelRepStacks, monthDailyComparison } from './lib/chartSeries'
 import { forecastForReview, forecastScopeNote, reviewTarget } from './lib/forecast'
 import { mtdWorkingDays } from './lib/hkHolidays'
 import { initialFilters, reconcileFilters } from './lib/filters'
@@ -213,6 +213,13 @@ export default function App() {
         ? customerWorkingDayMom(monthScoped, shareMonthKey, mtdThrough)
         : null,
     [monthScoped, shareMonthKey, mtdThrough],
+  )
+  const followUp = useMemo(
+    () =>
+      filters && shareMonthKey && mtdThrough
+        ? followUpAccounts(monthScoped, shareMonthKey, mtdThrough, filters.salesperson)
+        : null,
+    [filters, monthScoped, shareMonthKey, mtdThrough],
   )
   const modelStacks = useMemo(
     () =>
@@ -460,6 +467,7 @@ export default function App() {
         repRows={repRows}
         dayComparison={dayComparison}
         customerMom={customerMom}
+        followUp={followUp}
         modelStacks={modelStacks}
         mtdThroughLabel={mtdThrough ? mtdThrough.slice(5) : null}
         salesperson={filters.salesperson}

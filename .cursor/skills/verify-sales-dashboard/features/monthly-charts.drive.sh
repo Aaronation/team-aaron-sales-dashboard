@@ -27,6 +27,8 @@ V=(node "$ROOT/.cursor/skills/verify-sales-dashboard/helpers/verify.mjs")
 "${V[@]}" expect-text --text "W41" --scope "figure:Top customers · Oct 2026"
 "${V[@]}" expect-text --text "W42" --scope "figure:Top customers · Oct 2026"
 "${V[@]}" screenshot --name month-customers --scope "figure:Top customers · Oct 2026"
+"${V[@]}" expect-absent --text "Follow up" --scope "Monthly sales"
+"${V[@]}" expect-absent --text "Not yet" --scope "Monthly sales"
 
 "${V[@]}" expect-text --text "through 10-18" --scope "figure:Top product models · Oct 2026"
 "${V[@]}" expect-text --text "Aaron" --scope "figure:Top product models · Oct 2026"
@@ -40,6 +42,11 @@ V=(node "$ROOT/.cursor/skills/verify-sales-dashboard/helpers/verify.mjs")
 "${V[@]}" expect-text --text "Last month" --scope "figure:Kelvin top customers · Oct 2026"
 "${V[@]}" expect-absent --text "Vision" --scope "figure:Kelvin top customers · Oct 2026"
 "${V[@]}" screenshot --name month-customers-kelvin --scope "figure:Kelvin top customers · Oct 2026"
+"${V[@]}" expect-text --text "China Telecom (Macau)" --scope "figure:Follow up · Oct 2026 · 18 accounts"
+"${V[@]}" expect-text --text 'HK$53,000' --scope "figure:Follow up · Oct 2026 · 18 accounts"
+"${V[@]}" expect-text --text "Not yet" --scope "figure:Follow up · Oct 2026 · 18 accounts"
+"${V[@]}" expect-absent --text "In-Town" --scope "figure:Follow up · Oct 2026 · 18 accounts"
+"${V[@]}" screenshot --name month-follow-up-kelvin --scope css:.monthly__follow
 "${V[@]}" expect-text --text "Kelvin" --scope "figure:Kelvin top product models · Oct 2026"
 "${V[@]}" expect-absent --text "Aaron" --scope "figure:Kelvin top product models · Oct 2026"
 "${V[@]}" screenshot --name month-models-kelvin --scope "figure:Kelvin top product models · Oct 2026"
@@ -53,9 +60,23 @@ V=(node "$ROOT/.cursor/skills/verify-sales-dashboard/helpers/verify.mjs")
 "${V[@]}" expect-text --text "Vision" --scope "figure:Aaron top customers · Oct 2026"
 "${V[@]}" expect-absent --text "Lancer" --scope "figure:Aaron top customers · Oct 2026"
 "${V[@]}" expect-absent --text "Megatech" --scope "figure:Aaron top customers · Oct 2026"
+"${V[@]}" expect-absent --text "In-Town" --scope "figure:Aaron top customers · Oct 2026"
 "${V[@]}" screenshot --name month-customers-aaron --scope "figure:Aaron top customers · Oct 2026"
+"${V[@]}" expect-text --text "In-Town" --scope "figure:Follow up · Oct 2026 · 6 accounts"
+"${V[@]}" expect-text --text 'HK$27,590' --scope "figure:Follow up · Oct 2026 · 6 accounts"
+"${V[@]}" expect-text --text 'HK$12,000' --scope "figure:Follow up · Oct 2026 · 6 accounts"
+"${V[@]}" expect-text --text "Not yet" --scope "figure:Follow up · Oct 2026 · 6 accounts"
+"${V[@]}" expect-absent --text "No accounts to chase in this window." --scope "figure:Follow up · Oct 2026 · 6 accounts"
+"${V[@]}" expect-absent --text "China Telecom (Macau)" --scope "figure:Follow up · Oct 2026 · 6 accounts"
+"${V[@]}" screenshot --name month-follow-up-aaron --scope css:.monthly__follow
+"${V[@]}" aria --name month-follow-up-aaron --scope css:.monthly__follow
 
 "${V[@]}" select --label "Salesperson" --value all
+"${V[@]}" expect-value --label "Salesperson" --value all
+"${V[@]}" expect-absent --text "Follow up" --scope "Monthly sales"
+"${V[@]}" expect-absent --text "Not yet" --scope "Monthly sales"
+"${V[@]}" expect-text --text "Vision" --scope "figure:Top customers · Oct 2026"
+"${V[@]}" screenshot --name month-customers-all-after-rep --scope "figure:Top customers · Oct 2026"
 "${V[@]}" select --label "Review week" --value 2026-W41
 "${V[@]}" expect-value --label "Review week" --value 2026-W41
 "${V[@]}" expect-text --text "through 10-11" --scope "figure:Top customers · Oct 2026"
@@ -80,3 +101,8 @@ V=(node "$ROOT/.cursor/skills/verify-sales-dashboard/helpers/verify.mjs")
 "${V[@]}" expect-row --scope "Monthly sales" --row "Oct 2026" --text 'HK$725,442'
 "${V[@]}" screenshot --name month-days-august --scope "figure:Days in review month · Aug 2026"
 "${V[@]}" screenshot --name month-customers-august --scope "figure:Top customers · Aug 2026"
+"${V[@]}" select --label "Salesperson" --value "Aaron Chang"
+"${V[@]}" expect-text --text "No accounts to chase in this window." --scope "figure:Follow up · Aug 2026 · 0 accounts"
+"${V[@]}" expect-absent --text "Not yet" --scope "figure:Follow up · Aug 2026 · 0 accounts"
+"${V[@]}" screenshot --name month-follow-up-empty --scope "figure:Follow up · Aug 2026 · 0 accounts"
+"${V[@]}" select --label "Salesperson" --value all

@@ -250,6 +250,45 @@ export function customerWorkingDayMom(
   return { span, hasPrior, weeks, bars }
 }
 
+export type FollowUpAccount = {
+  name: string
+  /** Sell-out in last month's matching working-day window. */
+  prior: number
+}
+
+/**
+ * Customers to chase for one salesperson. Each row bought in last month's
+ * same working-day window and has no sell-out so far this period, ranked by
+ * that prior amount. Every match is included. `salesperson === 'all'` is the
+ * team view and returns null. `items` should already follow department and
+ * search, the same lines customer MoM uses. This applies the salesperson filter.
+ */
+export function followUpAccounts(
+  items: LineItem[],
+  monthKey: string,
+  throughDate: string,
+  salesperson: string,
+): FollowUpAccount[] | null {
+  if (salesperson === 'all') return null
+  const span = mtdComparisonSpan(monthKey, throughDate)
+  const currentTotals = new Map<string, number>()
+  const priorTotals = new Map<string, number>()
+  for (const row of items) {
+    if (!row.date || !row.customer || row.salesperson !== salesperson) continue
+    const amount = row.totalAmount || 0
+    if (inMonthThrough(row.date, monthKey, span.throughDate)) {
+      currentTotals.set(row.customer, (currentTotals.get(row.customer) ?? 0) + amount)
+    }
+    if (span.priorThroughDate && inMonthThrough(row.date, span.priorMonthKey, span.priorThroughDate)) {
+      priorTotals.set(row.customer, (priorTotals.get(row.customer) ?? 0) + amount)
+    }
+  }
+  return [...priorTotals.entries()]
+    .filter(([name, prior]) => prior > 0 && (currentTotals.get(name) ?? 0) === 0)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([name, prior]) => ({ name, prior }))
+}
+
 /**
  * Top product models by quantity, split by salesperson, for the review-month
  * MTD window (the 1st through `throughDate`).
