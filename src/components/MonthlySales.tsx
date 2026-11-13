@@ -148,9 +148,8 @@ function accountCountLabel(count: number): string {
   return `${count} ${count === 1 ? 'account' : 'accounts'}`
 }
 
-function followUpAmount(account: FollowUpAccount): string {
-  const windowAmount = account.priorWindow ?? 0
-  return `${formatMoney(Math.round(windowAmount))} / ${formatMoney(Math.round(account.priorMonth))}`
+function followUpMoney(amount: number): string {
+  return `$${Math.round(amount).toLocaleString('en-HK')}`
 }
 
 function FollowUpList({ shareLabel, accounts }: { shareLabel: string; accounts: FollowUpAccount[] }) {
@@ -159,15 +158,17 @@ function FollowUpList({ shareLabel, accounts }: { shareLabel: string; accounts: 
       <figcaption>
         {`Follow up · ${shareLabel}`}<span className="follow-up__count">{` · ${accountCountLabel(accounts.length)}`}</span>
       </figcaption>
-      <p className="monthly__caption">Amount is last month’s same working-day window / full last month.</p>
+      <p className="monthly__caption">Last month’s same working-day window / full last month.</p>
       {accounts.length === 0 ? (
-        <p className="monthly__empty">No accounts to chase in this window.</p>
+        <p className="monthly__empty">No accounts to chase for this period.</p>
       ) : (
         <ul className="follow-up__list">
           {accounts.map((account) => (
             <li key={account.name} className="follow-up__row">
               <span className="follow-up__name">{displayCustomer(account.name)}</span>
-              <span className="follow-up__amount">{followUpAmount(account)}</span>
+              <span className="follow-up__window">{followUpMoney(account.priorWindow ?? 0)}</span>
+              <span className="follow-up__slash">/</span>
+              <span className="follow-up__month">{followUpMoney(account.priorMonth)}</span>
             </li>
           ))}
         </ul>

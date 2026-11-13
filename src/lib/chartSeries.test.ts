@@ -503,11 +503,12 @@ describe('follow-up accounts', () => {
       kelvinTop: { name: 'China Telecom (Macau)', priorMonth: 53000, priorWindow: 53000 },
       aaronQuiet: { name: '一級廚具', priorMonth: 20680, priorWindow: null },
     })
+    const followUpMoney = (amount: number) => `$${Math.round(amount).toLocaleString('en-HK')}`
     const pair = (windowAmount: number | null, monthAmount: number) =>
-      `${formatMoney(Math.round(windowAmount ?? 0))} / ${formatMoney(Math.round(monthAmount))}`
-    expect(pair(aaron![0]!.priorWindow, aaron![0]!.priorMonth)).toBe('HK$27,590 / HK$44,490')
-    expect(pair(null, 20680)).toBe('HK$0 / HK$20,680')
-    expect(pair(kelvin![0]!.priorWindow, kelvin![0]!.priorMonth)).toBe('HK$53,000 / HK$53,000')
+      `${followUpMoney(windowAmount ?? 0)} / ${followUpMoney(monthAmount)}`
+    expect(pair(aaron![0]!.priorWindow, aaron![0]!.priorMonth)).toBe('$27,590 / $44,490')
+    expect(pair(null, 20680)).toBe('$0 / $20,680')
+    expect(pair(kelvin![0]!.priorWindow, kelvin![0]!.priorMonth)).toBe('$53,000 / $53,000')
 
     const chaseNames = new Set(aaron!.map((account) => account.name))
     expect(aaronMom.bars.every((bar) => bar.current > 0 && !chaseNames.has(bar.name))).toBe(true)
