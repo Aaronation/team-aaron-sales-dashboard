@@ -9,6 +9,7 @@ import {
   shortName,
 } from './aggregates'
 import { isWorkingDay } from './hkHolidays'
+import { canonicalizeCustomers } from './partnerAliases'
 import type { LineItem } from './types'
 
 export type MonthDayPoint = {
@@ -198,8 +199,9 @@ export function customerWorkingDayMom(
   throughDate: string,
   limit = 10,
 ): CustomerMom {
+  const named = canonicalizeCustomers(items)
   const span = mtdComparisonSpan(monthKey, throughDate)
-  const hasPrior = items.some(
+  const hasPrior = named.some(
     (row) => row.date != null && monthKeyFromDate(row.date) === span.priorMonthKey,
   )
   const currentTotals = new Map<string, number>()
@@ -207,7 +209,7 @@ export function customerWorkingDayMom(
   const currentQty = new Map<string, number>()
   const priorQty = new Map<string, number>()
   const byWeek = new Map<string, Map<string, number>>()
-  for (const row of items) {
+  for (const row of named) {
     if (!row.date || !row.customer) continue
     const amount = row.totalAmount || 0
     const quantity = row.quantity || 0
@@ -248,6 +250,60 @@ export function customerWorkingDayMom(
   })
   const weeks = [...usedWeeks].sort().map((weekKey) => ({ key: weekKey, label: weekTick(weekKey) }))
   return { span, hasPrior, weeks, bars }
+}
+
+export type FollowUpAccount = {
+  name: string
+  /** Full previous calendar month sell-out. The list is ranked by this. */
+  priorMonth: number
+  /**
+   * Last month’s same working-day window. Null when that window is not above
+   * zero; the row still shows HK$0 beside the full month.
+   */
+  priorWindow: number | null
+}
+
+/**
+ * Customers to chase for one salesperson. Each row had sell-out in the full
+ * previous calendar month and none so far this period (the review-month MTD
+ * window). Ranked by the full prior month. The shown amount is last month’s
+ * same working-day window when that window is above zero. Every match is
+ * included. `salesperson === 'all'` is the team view and returns null.
+ * `items` should already follow department and search. This applies the
+ * salesperson filter.
+ */
+export function followUpAccounts(
+  items: LineItem[],
+  monthKey: string,
+  throughDate: string,
+  salesperson: string,
+): FollowUpAccount[] | null {
+  if (salesperson === 'all') return null
+  const named = canonicalizeCustomers(items)
+  const span = mtdComparisonSpan(monthKey, throughDate)
+  const currentTotals = new Map<string, number>()
+  const priorMonthTotals = new Map<string, number>()
+  const priorWindowTotals = new Map<string, number>()
+  for (const row of named) {
+    if (!row.date || !row.customer || row.salesperson !== salesperson) continue
+    const amount = row.totalAmount || 0
+    if (inMonthThrough(row.date, monthKey, span.throughDate)) {
+      currentTotals.set(row.customer, (currentTotals.get(row.customer) ?? 0) + amount)
+    }
+    if (monthKeyFromDate(row.date) === span.priorMonthKey) {
+      priorMonthTotals.set(row.customer, (priorMonthTotals.get(row.customer) ?? 0) + amount)
+    }
+    if (span.priorThroughDate && inMonthThrough(row.date, span.priorMonthKey, span.priorThroughDate)) {
+      priorWindowTotals.set(row.customer, (priorWindowTotals.get(row.customer) ?? 0) + amount)
+    }
+  }
+  return [...priorMonthTotals.entries()]
+    .filter(([name, priorMonth]) => priorMonth > 0 && (currentTotals.get(name) ?? 0) === 0)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([name, priorMonth]) => {
+      const priorWindow = priorWindowTotals.get(name) ?? 0
+      return { name, priorMonth, priorWindow: priorWindow > 0 ? priorWindow : null }
+    })
 }
 
 /**

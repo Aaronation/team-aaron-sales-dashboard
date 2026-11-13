@@ -167,3 +167,126 @@ export const WGAL_PARTNER_ALIASES: Record<string, string> = {
   "駿馬CM": "駿馬CM",
 }
 
+/**
+ * Named accounts Aaron has called the same customer. This is not a rule that
+ * every "X" and "X Limited" match. Other legal-form suffixes stay separate.
+ */
+const CUSTOMER_ALIAS_GROUPS: readonly { label: string; names: readonly string[] }[] = [
+  {
+    label: 'CTM',
+    names: ['CTM', 'CTM Limited', '澳門電訊股份有限公司'],
+  },
+]
+
+function whitespaceCaseKey(name: string): string {
+  return name.replace(/\s+/g, '').toLowerCase()
+}
+
+const aliasLabelByKey = new Map<string, string>()
+for (const group of CUSTOMER_ALIAS_GROUPS) {
+  aliasLabelByKey.set(whitespaceCaseKey(group.label), group.label)
+  for (const name of group.names) aliasLabelByKey.set(whitespaceCaseKey(name), group.label)
+}
+
+/**
+ * Named customers Aaron asked to drop. Compared after the same identity key,
+ * once invisible characters and the legal suffixes the list label strips
+ * (有限公司 / 股份有限公司 / Limited) are removed. A stored
+ * `星馳通訊器材有限公司` therefore matches `星馳通訊器材`. This is not a
+ * prefix match: `星馳數碼` stays.
+ */
+const EXCLUDED_CUSTOMERS = ['星馳通訊器材', '星馳通訊'] as const
+
+const INVISIBLE_CHARS = /\u200B|\u200C|\u200D|\u2060|\uFEFF|\u180E/g
+const LEGAL_FORM =
+  /(?:\s+(?:company\s+limited|co\.?,?\s*ltd\.?|limited|ltd\.?|company)|股份有限公司|有限公司)/i
+
+function exclusionKey(name: string): string {
+  const folded = name.normalize('NFKC').replace(INVISIBLE_CHARS, '')
+  let text = folded
+  let previous = ''
+  while (text && text !== previous) {
+    previous = text
+    text = text.replace(LEGAL_FORM, '')
+  }
+  return customerMatchKey(text)
+}
+
+/**
+ * Identity for customer labels. Whitespace, including full-width spaces, and
+ * letter case do not make a second customer. Named alias groups, such as CTM,
+ * share one key. "Something" and "Something Limited" stay apart.
+ */
+export function customerMatchKey(name: string): string {
+  const base = whitespaceCaseKey(name)
+  const alias = aliasLabelByKey.get(base)
+  return alias ? whitespaceCaseKey(alias) : base
+}
+
+function aliasLabel(name: string): string | null {
+  return aliasLabelByKey.get(whitespaceCaseKey(name)) ?? null
+}
+
+export function isExcludedCustomer(name: string | null | undefined): boolean {
+  if (!name) return false
+  const key = exclusionKey(name)
+  return EXCLUDED_CUSTOMERS.some((excluded) => customerMatchKey(excluded) === key)
+}
+
+export function excludeCustomers<T extends { customer: string | null }>(items: readonly T[]): T[] {
+  return items.filter((row) => !isExcludedCustomer(row.customer))
+}
+
+function readableCustomerScore(name: string): number {
+  const trimmed = name.trim()
+  let score = 0
+  if (/[^\s]\s+[^\s]/.test(trimmed)) score += 4
+  if (/[^\s] [^\s]/.test(trimmed)) score += 2
+  const letters = trimmed.match(/[A-Za-z]/g)
+  if (letters?.some((letter) => letter.toLowerCase() !== letter)) score += 1
+  return score
+}
+
+/** One display label. A named alias uses its short name. Otherwise a spaced form wins. */
+export function canonicalCustomerLabel(names: readonly string[]): string {
+  for (const raw of names) {
+    const alias = aliasLabel(raw)
+    if (alias) return alias
+  }
+  const counts = new Map<string, number>()
+  for (const raw of names) {
+    const name = raw.trim()
+    if (!name) continue
+    counts.set(name, (counts.get(name) ?? 0) + 1)
+  }
+  const ranked = [...counts.entries()].sort((a, b) => {
+    const byScore = readableCustomerScore(b[0]) - readableCustomerScore(a[0])
+    if (byScore !== 0) return byScore
+    if (a[1] !== b[1]) return b[1] - a[1]
+    return a[0].localeCompare(b[0])
+  })
+  return ranked[0]?.[0] ?? ''
+}
+
+/** Copy lines so every customer group uses one label. Excluded customers are removed. */
+export function canonicalizeCustomers<T extends { customer: string | null }>(items: readonly T[]): T[] {
+  const source = excludeCustomers(items)
+  const byKey = new Map<string, string[]>()
+  for (const row of source) {
+    if (!row.customer) continue
+    const key = customerMatchKey(row.customer)
+    if (!key) continue
+    const list = byKey.get(key)
+    if (list) list.push(row.customer)
+    else byKey.set(key, [row.customer])
+  }
+  const labels = new Map<string, string>()
+  for (const [key, names] of byKey) labels.set(key, canonicalCustomerLabel(names))
+  return source.map((row) => {
+    if (!row.customer) return row
+    const label = labels.get(customerMatchKey(row.customer))
+    if (!label || label === row.customer) return row
+    return { ...row, customer: label }
+  })
+}
+

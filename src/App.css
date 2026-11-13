@@ -381,6 +381,76 @@
   margin-bottom: var(--space-4);
 }
 
+.monthly__follow {
+  display: grid;
+  grid-template-columns: 1.35fr 0.85fr;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+  align-items: start;
+}
+
+.monthly__follow > * {
+  min-width: 0;
+}
+
+.follow-up__count {
+  font-weight: 500;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+
+.follow-up__list {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  max-height: 520px;
+  overflow: auto;
+}
+
+.follow-up__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 8ch min-content 8ch;
+  column-gap: 0.22rem;
+  align-items: center;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.follow-up__row:last-child {
+  border-bottom: 0;
+}
+
+.follow-up__name {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: break-word;
+  padding-right: 0.25rem;
+}
+
+.follow-up__window,
+.follow-up__month,
+.follow-up__slash {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+.follow-up__window {
+  text-align: right;
+  color: var(--ink);
+}
+
+.follow-up__slash {
+  color: var(--ink-soft);
+}
+
+.follow-up__month {
+  text-align: right;
+  color: var(--ink-soft);
+}
+
 .monthly__caption {
   margin-bottom: 0.25rem;
   font-size: 0.82rem;
@@ -782,6 +852,12 @@ th button {
 
   .rep-board__nums {
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 860px) {
+  .monthly__follow {
+    grid-template-columns: 1fr;
   }
 }
 
