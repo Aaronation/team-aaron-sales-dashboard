@@ -1,5 +1,5 @@
 import type { LineItem } from './types'
-import { WGAL_PARTNER_ALIASES } from './partnerAliases'
+import { WGAL_PARTNER_ALIASES, excludeCustomers } from './partnerAliases'
 
 /**
  * Turn tabular records into dashboard line items.
@@ -422,7 +422,7 @@ export function ingestRecords(
   opts?: { source?: string },
 ): IngestResult {
   const sourceDefault = opts?.source ?? 'import'
-  const lineItems: LineItem[] = []
+  const parsed: LineItem[] = []
   let skipped = 0
   let missingSalesperson = 0
 
@@ -434,8 +434,10 @@ export function ingestRecords(
       continue
     }
     if (!item.salesperson) missingSalesperson += 1
-    lineItems.push(item)
+    parsed.push(item)
   }
+
+  const lineItems = excludeCustomers(parsed)
 
   if (lineItems.length === 0) {
     const sample = records
@@ -612,11 +614,13 @@ export function mergeImportedItems(
   incoming: LineItem[],
   mode: ImportMode,
 ): { lineItems: LineItem[]; added: number; replaced: number } {
+  const keptExisting = excludeCustomers(existing)
+  const keptIncoming = excludeCustomers(incoming)
   switch (mode) {
     case 'replace':
-      return { lineItems: incoming, added: incoming.length, replaced: 0 }
+      return { lineItems: keptIncoming, added: keptIncoming.length, replaced: 0 }
     case 'merge':
-      return mergeInvoiceSnapshots(existing, incoming)
+      return mergeInvoiceSnapshots(keptExisting, keptIncoming)
     default: {
       const unexpected: never = mode
       throw new Error(`Unexpected import mode: ${String(unexpected)}`)

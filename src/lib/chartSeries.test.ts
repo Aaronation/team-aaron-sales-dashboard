@@ -13,8 +13,10 @@ import {
 } from './aggregates'
 import { mtdWorkingDays } from './hkHolidays'
 import { AMBER, CLAY, CREAM, SAGE, TAUPE, customerWeekFill } from './palette'
+import { customerMatchKey } from './partnerAliases'
 import {
   customerWorkingDayMom,
+  followUpAccounts,
   modelRepStacks,
   monthDailyComparison,
   mtdComparisonSpan,
@@ -278,7 +280,8 @@ describe('customer working-day MoM and model reps', () => {
     const customerLines = (name: string, salesperson: string | null, start: string, end: string) =>
       payload.lineItems.filter(
         (row) =>
-          row.customer === name &&
+          row.customer != null &&
+          customerMatchKey(row.customer) === customerMatchKey(name) &&
           (salesperson == null || row.salesperson === salesperson) &&
           row.date != null &&
           row.date >= start &&
@@ -312,6 +315,235 @@ describe('customer working-day MoM and model reps', () => {
     const modelQty = models.bars.reduce((sum, bar) => sum + bar.total, 0)
     const earlierQty = modelsEarlier.bars.reduce((sum, bar) => sum + bar.total, 0)
     expect(earlierQty).toBeLessThan(modelQty)
+  })
+})
+
+describe('follow-up accounts', () => {
+  it('keeps every prior-window customer for the selected rep, with no cap', () => {
+    const chase = Array.from({ length: 16 }, (_, index) =>
+      line('2026-09-02', (16 - index) * 10, {
+        customer: `Chase ${String(index).padStart(2, '0')}`,
+        invoice: `chase-${index}`,
+      }),
+    )
+    const buying = Array.from({ length: 11 }, (_, index) =>
+      line('2026-10-06', 1000 - index, {
+        customer: `Now ${String(index).padStart(2, '0')}`,
+        invoice: `now-${index}`,
+      }),
+    )
+    const items = [
+      ...chase,
+      ...buying,
+      line('2026-09-02', 40, { customer: 'Split Co', invoice: 'split-a' }),
+      line('2026-09-03', 25, { customer: 'Split Co', invoice: 'split-b' }),
+      line('2026-09-02', 9999, { customer: 'Both Co', invoice: 'both-prior' }),
+      line('2026-10-06', 50, { customer: 'Both Co', invoice: 'both-now' }),
+      line('2026-09-16', 8000, { customer: 'Late Co', invoice: 'late' }),
+      line('2026-09-02', -20, { customer: 'Return Co', invoice: 'return' }),
+      line('2026-09-02', 70, { customer: 'Kelvin Only', salesperson: 'Kelvin Lai', invoice: 'kelvin' }),
+      line('2026-10-06', 80, { customer: 'Kelvin Now', salesperson: 'Kelvin Lai', invoice: 'kelvin-now' }),
+    ]
+
+    const aaron = followUpAccounts(items, '2026-10', '2026-10-18', 'Aaron Chang')
+    expect(aaron).not.toBeNull()
+    expect(aaron).toHaveLength(18)
+    expect(aaron?.[0]).toEqual({ name: 'Late Co', priorMonth: 8000, priorWindow: null })
+    expect(aaron?.[1]).toEqual({ name: 'Chase 00', priorMonth: 160, priorWindow: 160 })
+    expect(aaron?.find((account) => account.name === 'Split Co')).toEqual({
+      name: 'Split Co',
+      priorMonth: 65,
+      priorWindow: 65,
+    })
+    expect(aaron?.map((account) => account.name)).not.toContain('Both Co')
+    expect(aaron?.map((account) => account.name)).not.toContain('Return Co')
+    expect(aaron?.map((account) => account.name)).not.toContain('Now 00')
+    expect(aaron?.map((account) => account.name)).not.toContain('Kelvin Only')
+    expect(aaron?.every((account) => account.priorMonth > 0)).toBe(true)
+
+    const kelvin = followUpAccounts(items, '2026-10', '2026-10-18', 'Kelvin Lai')
+    expect(kelvin).toEqual([{ name: 'Kelvin Only', priorMonth: 70, priorWindow: 70 }])
+
+    const mom = customerWorkingDayMom(
+      items.filter((row) => row.salesperson === 'Aaron Chang'),
+      '2026-10',
+      '2026-10-18',
+    )
+    expect(mom.bars).toHaveLength(10)
+    expect(mom.bars.every((bar) => bar.current > 0)).toBe(true)
+    expect(mom.bars.map((bar) => bar.name).some((name) => name.startsWith('Chase'))).toBe(false)
+    expect(mom.bars.map((bar) => bar.name)).not.toContain('Now 10')
+  })
+
+  it('ranks equal prior amounts by customer name and sums repeated lines for one customer', () => {
+    const items = [
+      line('2026-09-04', 50, { customer: 'Vision', invoice: 'v' }),
+      line('2026-09-04', 30, { customer: 'Harbour', invoice: 'h' }),
+      line('2026-09-08', 20, { customer: 'Harbour', invoice: 'h2' }),
+      line('2026-09-04', 50, { customer: 'ADDL', invoice: 'a' }),
+    ]
+    expect(followUpAccounts(items, '2026-10', '2026-10-18', 'Aaron Chang')).toEqual([
+      { name: 'ADDL', priorMonth: 50, priorWindow: 50 },
+      { name: 'Harbour', priorMonth: 50, priorWindow: 50 },
+      { name: 'Vision', priorMonth: 50, priorWindow: 50 },
+    ])
+  })
+
+  it('includes the full previous month and shows a window amount only when that window is above zero', () => {
+    const items = [
+      line('2026-09-02', 100, { customer: 'Early', invoice: 'early' }),
+      line('2026-09-20', 500, { customer: 'Late', invoice: 'late' }),
+      line('2026-09-04', 80, { customer: 'Back', invoice: 'back-prior' }),
+      line('2026-10-06', 40, { customer: 'Back', invoice: 'back-now' }),
+      line('2026-10-08', 25, { customer: 'New', invoice: 'new' }),
+    ]
+    expect(followUpAccounts(items, '2026-10', '2026-10-18', 'Aaron Chang')).toEqual([
+      { name: 'Late', priorMonth: 500, priorWindow: null },
+      { name: 'Early', priorMonth: 100, priorWindow: 100 },
+    ])
+  })
+
+  it('lists every leftover account when some this-period customers are new', () => {
+    const lastMonth = Array.from({ length: 49 }, (_, index) =>
+      line('2026-09-20', 49 - index, {
+        customer: `Oct ${String(index).padStart(2, '0')}`,
+        invoice: `oct-${index}`,
+      }),
+    )
+    const overlap = Array.from({ length: 30 }, (_, index) =>
+      line('2026-10-06', 10, {
+        customer: `Oct ${String(index).padStart(2, '0')}`,
+        invoice: `nov-${index}`,
+      }),
+    )
+    const newcomers = Array.from({ length: 4 }, (_, index) =>
+      line('2026-10-06', 5, {
+        customer: `Nov ${index}`,
+        invoice: `new-${index}`,
+      }),
+    )
+    const items = [...lastMonth, ...overlap, ...newcomers]
+    const thisPeriod = new Set([...overlap, ...newcomers].map((row) => row.customer))
+    expect(thisPeriod.size).toBe(34)
+    expect(new Set(lastMonth.map((row) => row.customer)).size).toBe(49)
+
+    const chase = followUpAccounts(items, '2026-10', '2026-10-18', 'Aaron Chang')
+    expect(chase).toHaveLength(19)
+    expect(chase?.every((account) => !thisPeriod.has(account.name))).toBe(true)
+    expect(chase?.some((account) => account.name.startsWith('Nov'))).toBe(false)
+    expect(chase?.[0]).toEqual({ name: 'Oct 30', priorMonth: 19, priorWindow: null })
+    expect(chase?.map((account) => account.name)).toEqual(
+      Array.from({ length: 19 }, (_, index) => `Oct ${String(30 + index).padStart(2, '0')}`),
+    )
+
+    const allOverlap = [
+      ...Array.from({ length: 49 }, (_, index) =>
+        line('2026-09-03', 100 - index, {
+          customer: `Sep ${String(index).padStart(2, '0')}`,
+          invoice: `sep-${index}`,
+        }),
+      ),
+      ...Array.from({ length: 34 }, (_, index) =>
+        line('2026-10-06', 1, {
+          customer: `Sep ${String(index).padStart(2, '0')}`,
+          invoice: `back-${index}`,
+        }),
+      ),
+    ]
+    const leftover = followUpAccounts(allOverlap, '2026-10', '2026-10-18', 'Aaron Chang')
+    expect(leftover).toHaveLength(15)
+    expect(leftover?.map((account) => account.name)).toEqual(
+      Array.from({ length: 15 }, (_, index) => `Sep ${String(34 + index).padStart(2, '0')}`),
+    )
+  })
+
+  it('returns no list on the all-reps view', () => {
+    const items = [
+      line('2026-09-02', 100, { customer: 'Harbour', salesperson: 'Aaron Chang', invoice: 'a' }),
+      line('2026-09-02', 80, { customer: 'Lancer', salesperson: 'Kelvin Lai', invoice: 'k' }),
+      line('2026-09-02', 40, { customer: 'Megatech', salesperson: 'Kenny Ma', invoice: 'n' }),
+    ]
+    expect(followUpAccounts(items, '2026-10', '2026-10-18', 'all')).toBeNull()
+    expect(followUpAccounts(items, '2026-10', '2026-10-18', 'Kenny Ma')).toEqual([
+      { name: 'Megatech', priorMonth: 40, priorWindow: 40 },
+    ])
+  })
+
+  it('uses the seeded October W42 window for Aaron and Kelvin, and none for all reps', () => {
+    const payload = JSON.parse(readFileSync('public/data/sales-line-items.json', 'utf8')) as SalesPayload
+    const through = '2026-10-18'
+    const span = mtdComparisonSpan('2026-10', through)
+    expect(span).toMatchObject({ workingDayCount: 11, priorThroughDate: '2026-09-15' })
+
+    expect(followUpAccounts(payload.lineItems, '2026-10', through, 'all')).toBeNull()
+
+    const aaronMom = customerWorkingDayMom(
+      payload.lineItems.filter((row) => row.salesperson === 'Aaron Chang'),
+      '2026-10',
+      through,
+    )
+    const aaron = followUpAccounts(payload.lineItems, '2026-10', through, 'Aaron Chang')
+    const kelvin = followUpAccounts(payload.lineItems, '2026-10', through, 'Kelvin Lai')
+    expect(aaron!.length).toBeGreaterThan(3)
+    expect(kelvin!.length).toBeGreaterThan(18)
+    expect({
+      aaron: aaron!.length,
+      kelvin: kelvin!.length,
+      aaronNameOnly: aaron!.filter((account) => account.priorWindow == null).length,
+      kelvinNameOnly: kelvin!.filter((account) => account.priorWindow == null).length,
+      aaronTop: aaron![0],
+      kelvinTop: kelvin![0],
+      aaronQuiet: aaron!.find((account) => account.priorWindow == null),
+    }).toEqual({
+      aaron: 10,
+      kelvin: 28,
+      aaronNameOnly: 7,
+      kelvinNameOnly: 10,
+      aaronTop: { name: 'In-Town', priorMonth: 44490, priorWindow: 27590 },
+      kelvinTop: { name: 'China Telecom (Macau)', priorMonth: 53000, priorWindow: 53000 },
+      aaronQuiet: { name: '一級廚具', priorMonth: 20680, priorWindow: null },
+    })
+    const followUpMoney = (amount: number) => `$${Math.round(amount).toLocaleString('en-HK')}`
+    const pair = (windowAmount: number | null, monthAmount: number) =>
+      `${followUpMoney(windowAmount ?? 0)} / ${followUpMoney(monthAmount)}`
+    expect(pair(aaron![0]!.priorWindow, aaron![0]!.priorMonth)).toBe('$27,590 / $44,490')
+    expect(pair(null, 20680)).toBe('$0 / $20,680')
+    expect(pair(kelvin![0]!.priorWindow, kelvin![0]!.priorMonth)).toBe('$53,000 / $53,000')
+
+    const chaseNames = new Set(aaron!.map((account) => account.name))
+    expect(aaronMom.bars.every((bar) => bar.current > 0 && !chaseNames.has(bar.name))).toBe(true)
+    for (let index = 1; index < aaron!.length; index += 1) {
+      const prev = aaron![index - 1]!
+      const row = aaron![index]!
+      expect(
+        prev.priorMonth > row.priorMonth ||
+          (prev.priorMonth === row.priorMonth && prev.name.localeCompare(row.name) <= 0),
+      ).toBe(true)
+    }
+
+    const windowTotal = (name: string, salesperson: string, start: string, end: string) =>
+      payload.lineItems
+        .filter(
+          (row) =>
+            row.customer != null &&
+          customerMatchKey(row.customer) === customerMatchKey(name) &&
+            row.salesperson === salesperson &&
+            row.date != null &&
+            row.date >= start &&
+            row.date <= end,
+        )
+        .reduce((sum, row) => sum + row.totalAmount, 0)
+
+    for (const account of [...aaron!, ...kelvin!]) {
+      const salesperson = aaron!.includes(account) ? 'Aaron Chang' : 'Kelvin Lai'
+      expect(account.priorMonth).toBeGreaterThan(0)
+      expect(windowTotal(account.name, salesperson, '2026-10-01', through)).toBe(0)
+      expect(windowTotal(account.name, salesperson, '2026-09-01', '2026-09-30')).toBeCloseTo(account.priorMonth, 6)
+      const sameWindow = windowTotal(account.name, salesperson, '2026-09-01', span.priorThroughDate!)
+      if (sameWindow > 0) expect(account.priorWindow).toBeCloseTo(sameWindow, 6)
+      else expect(account.priorWindow).toBeNull()
+    }
+
   })
 })
 
