@@ -589,6 +589,22 @@ export function formatMoney(n: number): string {
   }).format(n)
 }
 
+/**
+ * Compact dollars for the Achieve-by-month sub-line only.
+ * Below $1,500,000: nearest thousand with k. At or above: one decimal million.
+ */
+export function formatCompactMoney(amount: number): string {
+  if (!Number.isFinite(amount)) return '—'
+  const sign = amount < 0 ? '-' : ''
+  const value = Math.abs(amount)
+  if (value >= 1_500_000) {
+    const millions = Math.round(value / 100_000) / 10
+    return `${sign}$${millions.toFixed(1)}m`
+  }
+  const thousands = Math.round(value / 1_000)
+  return `${sign}$${thousands.toLocaleString('en-HK')}k`
+}
+
 /** Unit ASP in whole HKD, same rounding as other money. Null (no units) is an em dash. */
 export function formatAsp(value: number | null): string {
   if (value == null || !Number.isFinite(value)) return '—'

@@ -16,6 +16,7 @@ import {
   averageSellingPrice,
   formatAsp,
   displayCustomer,
+  formatCompactMoney,
   formatMoney,
   formatMonthLabel,
   MONTHLY_TEAM_TARGETS,
@@ -780,8 +781,12 @@ function RepTargets({
                         className={month.monthKey === activeMonthKey ? 'is-active' : undefined}
                       >
                         <span>{formatAchieve(month.achieve)}</span>
-                        <span className="rep-targets__sub">
-                          {month.target == null ? 'no target' : formatMoney(month.target)}
+                        <span className="rep-targets__amounts">
+                          <span className="rep-targets__actual">{formatCompactMoney(month.revenue)}</span>
+                          <span className="rep-targets__slash">/</span>
+                          <span className="rep-targets__target">
+                            {month.target == null ? 'no target' : formatCompactMoney(month.target)}
+                          </span>
                         </span>
                       </td>
                     ))}
